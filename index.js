@@ -11,6 +11,14 @@ import pino from 'pino';
 import dotenv from 'dotenv';
 import readline from 'readline';
 import NodeCache from 'node-cache';
+import { handleCommand, isCommand } from './plugins/commands.js';
+import { 
+    isBotActive, 
+    isGroupPaused, 
+    shouldFilterMessage,
+    getTelegramChannel,
+    loadConfig
+} from './utils/config.js';
 
 dotenv.config();
 
@@ -85,10 +93,21 @@ function getMentions(msg) {
  * المعالج الرئيسي للرسائل الواردة
  */
 async function handleNewMessage(msg) {
-    if (!msg.message || msg.key.remoteJid !== WHATSAPP_GROUP_JID) return;
+    // دعم الجسور المتعددة - التحقق من أي جروب مسجل
+    const config = loadConfig();
+    const groupJid = msg.key.remoteJid;
+    
+    // إذا كان هناك WHATSAPP_GROUP_JID في .env، نستخدمه
+    // وإلا، نتحقق من config.json
+    const isFromMonitoredGroup = WHATSAPP_GROUP_JID ? 
+        groupJid === WHATSAPP_GROUP_JID : 
+        config.bridges.some(b => b.whatsapp === groupJid);
+    
+    if (!msg.message || !isFromMonitoredGroup) return;
 
     const senderName = msg.pushName || 'غير معروف';
     const messageId = msg.key.id;
+    const senderPhone = msg.key.participant?.split('@')[0] || msg.key.remoteJid?.split('@')[0];
     
     console.log(`\n📨 رسالة جديدة من ${senderName} (ID: ${messageId})`);
 
@@ -106,6 +125,46 @@ async function handleNewMessage(msg) {
         const messageType = actualMessageKey;
         const messageContent = msg.message[messageType];
 
+        // معالجة الأوامر للمستخدمين من النخبة
+        const text = messageContent.text || messageContent;
+        if (typeof text === 'string' && isCommand(text)) {
+            const result = await handleCommand(msg, sock, telegramBot);
+            if (result && result.handled && result.response) {
+                // إرسال الرد على WhatsApp
+                await sock.sendMessage(groupJid, { text: result.response });
+                console.log('✅ تم إرسال رد الأمر');
+            }
+            return; // لا نقوم بنقل الأوامر إلى Telegram
+        }
+
+        // التحقق من حالة البوت
+        if (!isBotActive()) {
+            console.log('⏸️ البوت متوقف - تم تجاهل الرسالة');
+            return;
+        }
+
+        // التحقق من حالة الجروب
+        if (isGroupPaused(groupJid)) {
+            console.log('⏸️ الجروب متوقف مؤقتاً - تم تجاهل الرسالة');
+            return;
+        }
+
+        // تطبيق الفلاتر
+        if (shouldFilterMessage(senderPhone, text, messageType)) {
+            console.log('🔍 تم فلترة الرسالة');
+            return;
+        }
+
+        // تحديد القناة المستهدفة
+        let targetChannel = TELEGRAM_CHANNEL_ID;
+        if (!targetChannel) {
+            targetChannel = getTelegramChannel(groupJid);
+            if (!targetChannel) {
+                console.log('⚠️ لا توجد قناة مرتبطة بهذا الجروب');
+                return;
+            }
+        }
+
         // استخراج معلومات إضافية
         const replyInfo = getQuotedInfo(msg);
         const mentionInfo = getMentions(msg);
@@ -113,13 +172,12 @@ async function handleNewMessage(msg) {
         switch (messageType) {
             case 'conversation':
             case 'extendedTextMessage':
-                const text = messageContent.text || messageContent;
                 const finalMessage = FORWARD_SENDER_NAME ? 
                     buildCaption(senderName, text) + replyInfo + mentionInfo : 
                     text + replyInfo + mentionInfo;
                 
                 const sentMsg = await telegramBot.telegram.sendMessage(
-                    TELEGRAM_CHANNEL_ID, 
+                    targetChannel, 
                     finalMessage, 
                     { parse_mode: 'Markdown' }
                 );
@@ -138,11 +196,11 @@ async function handleNewMessage(msg) {
                     + replyInfo + mentionInfo;
                 
                 const mediaSent = isVideo ? 
-                    await telegramBot.telegram.sendVideo(TELEGRAM_CHANNEL_ID, { source: stream }, { 
+                    await telegramBot.telegram.sendVideo(targetChannel, { source: stream }, { 
                         caption: captionText || undefined, 
                         parse_mode: 'Markdown' 
                     }) :
-                    await telegramBot.telegram.sendPhoto(TELEGRAM_CHANNEL_ID, { source: stream }, { 
+                    await telegramBot.telegram.sendPhoto(targetChannel, { source: stream }, { 
                         caption: captionText || undefined, 
                         parse_mode: 'Markdown' 
                     });
@@ -160,7 +218,7 @@ async function handleNewMessage(msg) {
                     + replyInfo + mentionInfo;
                 
                 const docSent = await telegramBot.telegram.sendDocument(
-                    TELEGRAM_CHANNEL_ID, 
+                    targetChannel, 
                     { source: docStream, filename: messageContent.fileName || 'document' }, 
                     { caption: docCaption || undefined, parse_mode: 'Markdown' }
                 );
@@ -176,7 +234,7 @@ async function handleNewMessage(msg) {
                 const audioCaption = buildCaption(senderName, '', '🎵 رسالة صوتية') + replyInfo;
                 
                 const audioSent = await telegramBot.telegram.sendAudio(
-                    TELEGRAM_CHANNEL_ID, 
+                    targetChannel, 
                     { source: audioStream }, 
                     { caption: audioCaption || undefined, parse_mode: 'Markdown' }
                 );
@@ -189,7 +247,7 @@ async function handleNewMessage(msg) {
                     logger, 
                     reuploadRequest: sock.updateMediaMessage 
                 });
-                const stickerSent = await telegramBot.telegram.sendSticker(TELEGRAM_CHANNEL_ID, { source: stickerStream });
+                const stickerSent = await telegramBot.telegram.sendSticker(targetChannel, { source: stickerStream });
                 messageCache.set(messageId, stickerSent.message_id);
                 console.log('✅ تم إرسال الملصق إلى Telegram');
                 break;
@@ -200,7 +258,7 @@ async function handleNewMessage(msg) {
                 const pollOptions = poll.options.map(opt => opt.optionName);
                 
                 const pollSent = await telegramBot.telegram.sendPoll(
-                    TELEGRAM_CHANNEL_ID, 
+                    targetChannel, 
                     pollQuestion || 'تصويت', 
                     pollOptions, 
                     { is_anonymous: false }
@@ -218,7 +276,7 @@ async function handleNewMessage(msg) {
                 );
                 
                 const contactSent = await telegramBot.telegram.sendMessage(
-                    TELEGRAM_CHANNEL_ID, 
+                    targetChannel, 
                     contactText, 
                     { parse_mode: 'Markdown' }
                 );
@@ -234,14 +292,14 @@ async function handleNewMessage(msg) {
                 );
                 
                 await telegramBot.telegram.sendLocation(
-                    TELEGRAM_CHANNEL_ID, 
+                    targetChannel, 
                     location.degreesLatitude, 
                     location.degreesLongitude
                 );
                 
                 if (locationText) {
                     await telegramBot.telegram.sendMessage(
-                        TELEGRAM_CHANNEL_ID, 
+                        targetChannel, 
                         locationText, 
                         { parse_mode: 'Markdown' }
                     );
@@ -257,13 +315,13 @@ async function handleNewMessage(msg) {
                 );
                 
                 await telegramBot.telegram.sendLocation(
-                    TELEGRAM_CHANNEL_ID, 
+                    targetChannel, 
                     liveLocation.degreesLatitude, 
                     liveLocation.degreesLongitude
                 );
                 
                 await telegramBot.telegram.sendMessage(
-                    TELEGRAM_CHANNEL_ID, 
+                    targetChannel, 
                     liveLocationText, 
                     { parse_mode: 'Markdown' }
                 );
@@ -276,7 +334,7 @@ async function handleNewMessage(msg) {
                     const emoji = reaction.text || '❤️';
                     const reactionText = buildCaption(senderName, `تفاعل بـ ${emoji}`);
                     await telegramBot.telegram.sendMessage(
-                        TELEGRAM_CHANNEL_ID, 
+                        targetChannel, 
                         reactionText, 
                         { parse_mode: 'Markdown' }
                     );
@@ -292,11 +350,11 @@ async function handleNewMessage(msg) {
                     
                     if (telegramMsgId) {
                         try {
-                            await telegramBot.telegram.deleteMessage(TELEGRAM_CHANNEL_ID, telegramMsgId);
+                            await telegramBot.telegram.deleteMessage(targetChannel, telegramMsgId);
                             console.log('🗑️ تم حذف الرسالة من Telegram');
                         } catch (e) {
                             await telegramBot.telegram.sendMessage(
-                                TELEGRAM_CHANNEL_ID, 
+                                targetChannel, 
                                 '🗑️ *تم حذف رسالة من الواتساب*', 
                                 { parse_mode: 'Markdown' }
                             );
@@ -334,7 +392,7 @@ async function handleMessageUpdate(updates) {
                 
                 if (telegramMsgId) {
                     try {
-                        await telegramBot.telegram.deleteMessage(TELEGRAM_CHANNEL_ID, telegramMsgId);
+                        await telegramBot.telegram.deleteMessage(targetChannel, telegramMsgId);
                         console.log('✏️ تم حذف النسخة القديمة من Telegram');
                     } catch (e) {
                         console.log('⚠️ لم يتم العثور على الرسالة القديمة للحذف');
