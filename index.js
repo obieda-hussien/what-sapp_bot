@@ -20,7 +20,8 @@ import {
     loadConfig,
     setBotStatus,
     CONFIG_PATH,
-    savePhoneToEnv
+    savePhoneToEnv,
+    saveConfig
 } from './utils/config.js';
 import { 
     logError, 
@@ -40,9 +41,9 @@ dotenv.config();
 const initialConfig = loadConfig();
 
 // عرض معلومات بدء التشغيل
-console.log('\n╔════════════════════════════════════════════════════════════════════════════╗');
+console.log('\n╔════════════════════════════════════════════════════════════╗');
 console.log('║           🤖 WhatsApp to Telegram Bridge Bot - Starting...                ║');
-console.log('╚════════════════════════════════════════════════════════════════════════════╝\n');
+console.log('╚════════════════════════════════════════════════════════════╝');
 console.log(`📁 مجلد العمل: ${process.cwd()}`);
 console.log(`📝 ملف الإعدادات: ${CONFIG_PATH}`);
 console.log(`📂 ملف .env: ${process.env.TELEGRAM_BOT_TOKEN ? '✅ موجود' : '❌ غير موجود'}`);
@@ -179,6 +180,9 @@ async function handleNewMessage(msg) {
     
     console.log(`\n📨 رسالة جديدة من ${senderName} (ID: ${messageId})`);
 
+    // متغير لحفظ محتوى النص للاستخدام في catch block
+    let textContent = '';
+
     try {
         // التحقق من حالة البوت
         if (!isBotActive()) {
@@ -213,8 +217,8 @@ async function handleNewMessage(msg) {
             }
         }
 
-        // تسجيل رسالة واتساب
-        const textContent = typeof text === 'string' ? text : JSON.stringify(messageContent).substring(0, 100);
+        // تسجيل رسالة واتساب وحفظ محتوى النص
+        textContent = typeof text === 'string' ? text : JSON.stringify(messageContent).substring(0, 100);
         logWhatsAppMessage(senderName, senderPhone, groupJid, messageType, textContent);
 
         // استخراج معلومات إضافية
@@ -249,7 +253,7 @@ async function handleNewMessage(msg) {
                         }
                     }
                 } catch (error) {
-                    logFailedTransfer(senderName, senderPhone, messageType, error.message, text);
+                    logFailedTransfer(senderName, senderPhone, messageType, error.message, textContent);
                     logTelegramMessage(targetChannel, messageType, false);
                     logError('فشل إرسال رسالة نصية', error);
                     throw error;
@@ -330,14 +334,27 @@ async function handleNewMessage(msg) {
                 const pollQuestion = buildCaption(senderName, poll.name, '📊');
                 const pollOptions = poll.options.map(opt => opt.optionName);
                 
-                const pollSent = await telegramBot.telegram.sendPoll(
-                    targetChannel, 
-                    pollQuestion || 'تصويت', 
-                    pollOptions, 
-                    { is_anonymous: false }
-                );
-                messageCache.set(messageId, pollSent.message_id);
-                console.log('✅ تم إرسال التصويت إلى Telegram');
+                try {
+                    const pollSent = await telegramBot.telegram.sendPoll(
+                        targetChannel, 
+                        pollQuestion || 'تصويت', 
+                        pollOptions, 
+                        { is_anonymous: true } // تغيير إلى true للتوافق مع القنوات
+                    );
+                    messageCache.set(messageId, pollSent.message_id);
+                    console.log('✅ تم إرسال التصويت إلى Telegram');
+                } catch (pollError) {
+                    // إذا فشل إرسال التصويت، نرسله كرسالة نصية
+                    console.log('⚠️ لا يمكن إرسال التصويت، سيتم إرساله كنص');
+                    const pollText = `📊 *تصويت من ${senderName}*\n\n*${poll.name}*\n\nالخيارات:\n${pollOptions.map((opt, i) => `${i + 1}. ${opt}`).join('\n')}`;
+                    const pollTextSent = await telegramBot.telegram.sendMessage(
+                        targetChannel, 
+                        pollText, 
+                        { parse_mode: 'Markdown' }
+                    );
+                    messageCache.set(messageId, pollTextSent.message_id);
+                    console.log('✅ تم إرسال التصويت كنص إلى Telegram');
+                }
                 break;
 
             case 'contactMessage':
