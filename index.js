@@ -547,6 +547,41 @@ async function connectToWhatsApp() {
             console.log('║     ✅ تم الاتصال بواتساب بنجاح!              ║');
             console.log('╚════════════════════════════════════════════════╝\n');
             
+            // إضافة الرقم المسجل تلقائياً إلى النخبة
+            try {
+                const me = sock.user;
+                if (me && me.id) {
+                    const myPhone = me.id.split(':')[0].replace(/\D/g, '');
+                    const myLid = me.lid || null;
+                    
+                    const config = loadConfig();
+                    let updated = false;
+                    
+                    // إضافة رقم الهاتف إلى النخبة
+                    if (myPhone && !config.eliteUsers.includes(myPhone)) {
+                        config.eliteUsers.push(myPhone);
+                        updated = true;
+                        console.log(`✅ تم إضافة رقمك (${myPhone}) تلقائياً إلى قائمة النخبة`);
+                    }
+                    
+                    // إضافة LID إلى النخبة إذا كان متوفراً
+                    if (myLid && !config.eliteUsers.includes(myLid)) {
+                        config.eliteUsers.push(myLid);
+                        updated = true;
+                        console.log(`✅ تم إضافة LID (${myLid}) تلقائياً إلى قائمة النخبة`);
+                    }
+                    
+                    // حفظ التحديثات
+                    if (updated) {
+                        const { saveConfig } = await import('./utils/config.js');
+                        saveConfig(config);
+                        console.log('💾 تم حفظ بياناتك في config.json');
+                    }
+                }
+            } catch (error) {
+                console.error('⚠️ تحذير: لم نستطع إضافة رقمك تلقائياً:', error.message);
+            }
+            
             // عرض جميع المجموعات عند الاتصال الناجح
             await displayAllGroups();
         }
