@@ -86,7 +86,7 @@ export async function handleCommand(msg, sock, telegramBot) {
         console.log(`💡 نصيحة: أضف رقمك إلى OWNER_PHONE في ملف .env أو استخدم .اضافة_نخبة من مستخدم نخبة آخر`);
         return {
             handled: true,
-            response: '⛔ عذراً، هذا الأمر متاح فقط لمستخدمي النخبة\n\n💡 للحصول على صلاحيات:\n1. أضف رقمك في ملف .env (OWNER_PHONE)\n[...]
+            response: '⛔ عذراً، هذا الأمر متاح فقط لمستخدمي النخبة\n\n💡 للحصول على صلاحيات:\n1. أضف رقمك في ملف .env (OWNER_PHONE)\n2. اطلب من مستخدم نخبة آخر إضافتك'
         };
     }
 
@@ -867,7 +867,7 @@ async function handleLogsCommand(args) {
     if (args.length < 1) {
         return {
             handled: true,
-            response: '❌ الاستخدام الصحيح:\n.لوج <نوع>\n\nالأنواع المتاحة:\n• errors\n• whatsapp-messages\n• telegram-messages\n• failed-transfers\n• com[...]
+            response: '❌ الاستخدام الصحيح:\n.لوج <نوع>\n\nالأنواع المتاحة:\n• errors\n• whatsapp-messages\n• telegram-messages\n• failed-transfers\n• commands'
         };
     }
     
