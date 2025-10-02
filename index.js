@@ -513,14 +513,21 @@ async function handleMessageUpdate(updates) {
                         console.log('⚠️ لم يتم العثور على الرسالة القديمة للحذف');
                     }
                     
+                    // إنشاء رسالة محدثة مع الحفاظ على جميع المعلومات الضرورية
                     const updatedMsg = {
-                        key: update.key,
+                        key: {
+                            ...update.key,
+                            remoteJid: groupJid, // تأكد من وجود remoteJid
+                            id: messageId
+                        },
                         message: update.update.message,
-                        pushName: update.pushName || 'غير معروف'
+                        pushName: update.pushName || 'غير معروف',
+                        messageTimestamp: update.messageTimestamp || Date.now()
                     };
                     
+                    // إرسال الرسالة المعدلة
                     await handleNewMessage(updatedMsg);
-                    console.log('✅ تم إرسال النسخة المعدلة');
+                    console.log('✅ تم إرسال النسخة المعدلة إلى Telegram');
                 }
             }
         }
