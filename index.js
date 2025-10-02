@@ -138,7 +138,8 @@ async function handleNewMessage(msg) {
     const protocolMessages = [
         'senderKeyDistributionMessage', 
         'messageContextInfo',
-        'associatedChildMessage'  // رسالة مرتبطة - تظهر مع الردود على الوسائط
+        'associatedChildMessage',  // رسالة مرتبطة - تظهر مع الردود على الوسائط
+        'editedMessage'  // معلومات عن الرسالة المعدلة - تُعالج في handleMessageUpdate
     ];
     const actualMessageKey = messageKeys.find(key => !protocolMessages.includes(key));
     
