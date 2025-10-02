@@ -29,6 +29,16 @@ export function loadConfig() {
                 }
             }
             
+            // إضافة الجسر من .env إلى bridges تلقائياً إذا كان موجوداً
+            if (process.env.WHATSAPP_GROUP_JID && process.env.TELEGRAM_CHANNEL_ID) {
+                defaultConfig.bridges.push({
+                    whatsapp: process.env.WHATSAPP_GROUP_JID,
+                    telegram: process.env.TELEGRAM_CHANNEL_ID,
+                    enabled: true
+                });
+                console.log(`✅ تم إضافة الجسر (${process.env.WHATSAPP_GROUP_JID} → ${process.env.TELEGRAM_CHANNEL_ID}) تلقائياً`);
+            }
+            
             // التأكد من وجود المجلد الأب
             const configDir = path.dirname(CONFIG_PATH);
             if (!fs.existsSync(configDir)) {
@@ -52,15 +62,37 @@ export function loadConfig() {
         if (!mergedConfig.schedules) mergedConfig.schedules = defaultConfig.schedules;
         if (!mergedConfig.admins) mergedConfig.admins = defaultConfig.admins;
         
+        let needsSave = false;
+        
         // إضافة OWNER_PHONE من .env إلى eliteUsers إذا لم يكن موجوداً
         if (process.env.OWNER_PHONE) {
             const ownerPhone = process.env.OWNER_PHONE.replace(/\D/g, '');
             if (ownerPhone && !mergedConfig.eliteUsers.includes(ownerPhone)) {
                 mergedConfig.eliteUsers.push(ownerPhone);
                 console.log(`✅ تم إضافة المالك (${ownerPhone}) تلقائياً إلى قائمة النخبة`);
-                // حفظ التحديث
-                saveConfig(mergedConfig);
+                needsSave = true;
             }
+        }
+        
+        // إضافة الجسر من .env إلى bridges إذا لم يكن موجوداً
+        if (process.env.WHATSAPP_GROUP_JID && process.env.TELEGRAM_CHANNEL_ID) {
+            const existingBridge = mergedConfig.bridges.find(
+                b => b.whatsapp === process.env.WHATSAPP_GROUP_JID
+            );
+            if (!existingBridge) {
+                mergedConfig.bridges.push({
+                    whatsapp: process.env.WHATSAPP_GROUP_JID,
+                    telegram: process.env.TELEGRAM_CHANNEL_ID,
+                    enabled: true
+                });
+                console.log(`✅ تم إضافة الجسر (${process.env.WHATSAPP_GROUP_JID} → ${process.env.TELEGRAM_CHANNEL_ID}) تلقائياً`);
+                needsSave = true;
+            }
+        }
+        
+        // حفظ التحديثات إذا كانت هناك تغييرات
+        if (needsSave) {
+            saveConfig(mergedConfig);
         }
         
         return mergedConfig;
@@ -104,6 +136,41 @@ export function saveConfig(config) {
         return true;
     } catch (error) {
         console.error('❌ خطأ في حفظ ملف الإعدادات:', error.message);
+        return false;
+    }
+}
+
+/**
+ * حفظ الرقم المسجل في ملف .env
+ */
+export function savePhoneToEnv(phone, lid = null) {
+    try {
+        const envPath = path.join(__dirname, '..', '.env');
+        
+        // قراءة ملف .env الحالي
+        let envContent = '';
+        if (fs.existsSync(envPath)) {
+            envContent = fs.readFileSync(envPath, 'utf8');
+        }
+        
+        // التحقق من وجود OWNER_PHONE بالفعل
+        const ownerPhoneRegex = /^OWNER_PHONE=.*/m;
+        
+        if (ownerPhoneRegex.test(envContent)) {
+            // استبدال القيمة الحالية
+            envContent = envContent.replace(ownerPhoneRegex, `OWNER_PHONE=${phone}`);
+            console.log(`✅ تم تحديث OWNER_PHONE في .env إلى: ${phone}`);
+        } else {
+            // إضافة السطر الجديد
+            envContent += `\n# Auto-added by bot on first connection\nOWNER_PHONE=${phone}\n`;
+            console.log(`✅ تم إضافة OWNER_PHONE إلى .env: ${phone}`);
+        }
+        
+        // حفظ الملف
+        fs.writeFileSync(envPath, envContent, 'utf8');
+        return true;
+    } catch (error) {
+        console.error('❌ خطأ في حفظ الرقم في .env:', error.message);
         return false;
     }
 }

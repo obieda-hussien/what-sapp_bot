@@ -19,7 +19,8 @@ import {
     getTelegramChannel,
     loadConfig,
     setBotStatus,
-    CONFIG_PATH
+    CONFIG_PATH,
+    savePhoneToEnv
 } from './utils/config.js';
 import { 
     logError, 
@@ -124,9 +125,44 @@ function getMentions(msg) {
  * المعالج الرئيسي للرسائل الواردة
  */
 async function handleNewMessage(msg) {
+    if (!msg.message) return;
+    
+    const groupJid = msg.key.remoteJid;
+    const senderName = msg.pushName || 'غير معروف';
+    const messageId = msg.key.id;
+    const senderPhone = msg.key.participant?.split('@')[0] || msg.key.remoteJid?.split('@')[0];
+    
+    // استخراج نوع الرسالة مع تجاهل الرسائل البروتوكولية
+    const messageKeys = Object.keys(msg.message);
+    const protocolMessages = ['senderKeyDistributionMessage', 'messageContextInfo'];
+    const actualMessageKey = messageKeys.find(key => !protocolMessages.includes(key));
+    
+    if (!actualMessageKey) {
+        return; // رسالة بروتوكولية فقط
+    }
+    
+    const messageType = actualMessageKey;
+    const messageContent = msg.message[messageType];
+    
+    // معالجة الأوامر من أي محادثة (جروب، خاص، إلخ)
+    const text = messageContent.text || messageContent;
+    if (typeof text === 'string' && isCommand(text)) {
+        console.log(`\n📨 رسالة جديدة من ${senderName} (ID: ${messageId})`);
+        console.log(`⚡ تم اكتشاف أمر: ${text}`);
+        
+        const result = await handleCommand(msg, sock, telegramBot);
+        if (result && result.handled && result.response) {
+            // إرسال الرد على WhatsApp في نفس المحادثة
+            await sock.sendMessage(groupJid, { text: result.response });
+            console.log('✅ تم إرسال رد الأمر');
+        } else if (result && result.handled) {
+            console.log('✅ تم معالجة الأمر بدون رد');
+        }
+        return; // لا نقوم بنقل الأوامر إلى Telegram
+    }
+    
     // دعم الجسور المتعددة - التحقق من أي جروب مسجل
     const config = loadConfig();
-    const groupJid = msg.key.remoteJid;
     
     // إذا كان هناك WHATSAPP_GROUP_JID في .env، نستخدمه
     // وإلا، نتحقق من config.json
@@ -134,45 +170,12 @@ async function handleNewMessage(msg) {
         groupJid === WHATSAPP_GROUP_JID : 
         config.bridges.some(b => b.whatsapp === groupJid);
     
-    if (!msg.message || !isFromMonitoredGroup) return;
-
-    const senderName = msg.pushName || 'غير معروف';
-    const messageId = msg.key.id;
-    const senderPhone = msg.key.participant?.split('@')[0] || msg.key.remoteJid?.split('@')[0];
+    // إذا لم تكن الرسالة من جروب مراقب، نتجاهلها (ما عدا الأوامر)
+    if (!isFromMonitoredGroup) return;
     
     console.log(`\n📨 رسالة جديدة من ${senderName} (ID: ${messageId})`);
 
     try {
-        // استخراج نوع الرسالة مع تجاهل الرسائل البروتوكولية
-        const messageKeys = Object.keys(msg.message);
-        const protocolMessages = ['senderKeyDistributionMessage', 'messageContextInfo'];
-        const actualMessageKey = messageKeys.find(key => !protocolMessages.includes(key));
-        
-        if (!actualMessageKey) {
-            console.log('⚠️ رسالة بروتوكولية فقط - تم التجاهل');
-            return;
-        }
-        
-        const messageType = actualMessageKey;
-        const messageContent = msg.message[messageType];
-
-        // معالجة الأوامر للمستخدمين من النخبة
-        const text = messageContent.text || messageContent;
-        if (typeof text === 'string' && isCommand(text)) {
-            console.log(`\n⚡ تم اكتشاف أمر: ${text}`);
-            const result = await handleCommand(msg, sock, telegramBot);
-            if (result && result.handled && result.response) {
-                // إرسال الرد على WhatsApp
-                await sock.sendMessage(groupJid, { text: result.response });
-                console.log('✅ تم إرسال رد الأمر');
-            } else if (result && result.handled) {
-                console.log('✅ تم معالجة الأمر بدون رد');
-            } else {
-                console.log('⚠️ الأمر لم يتم معالجته');
-            }
-            return; // لا نقوم بنقل الأوامر إلى Telegram
-        }
-
         // التحقق من حالة البوت
         if (!isBotActive()) {
             console.log('⏸️ البوت متوقف - تم تجاهل الرسالة');
@@ -185,6 +188,9 @@ async function handleNewMessage(msg) {
             return;
         }
 
+        // إعادة تحديد text للرسائل غير الأوامر
+        const text = messageContent.text || messageContent;
+        
         // تطبيق الفلاتر
         if (shouldFilterMessage(senderPhone, text, messageType)) {
             console.log('🔍 تم فلترة الرسالة');
@@ -192,6 +198,7 @@ async function handleNewMessage(msg) {
         }
 
         // تحديد القناة المستهدفة
+        const config = loadConfig();
         let targetChannel = TELEGRAM_CHANNEL_ID;
         if (!targetChannel) {
             targetChannel = getTelegramChannel(groupJid);
@@ -571,12 +578,20 @@ async function connectToWhatsApp() {
                         console.log(`✅ تم إضافة LID (${myLid}) تلقائياً إلى قائمة النخبة`);
                     }
                     
-                    // حفظ التحديثات
+                    // حفظ التحديثات في config.json
                     if (updated) {
-                        const { saveConfig } = await import('./utils/config.js');
                         saveConfig(config);
                         console.log('💾 تم حفظ بياناتك في config.json');
                     }
+                    
+                    // حفظ الرقم في ملف .env
+                    if (myPhone) {
+                        savePhoneToEnv(myPhone, myLid);
+                        console.log('💾 تم حفظ رقمك في ملف .env');
+                    }
+                    
+                    console.log('\n🎉 يمكنك الآن استخدام جميع الأوامر من أي محادثة في الواتس!');
+                    console.log('💡 جرب: .تست أو .المساعدة\n');
                 }
             } catch (error) {
                 console.error('⚠️ تحذير: لم نستطع إضافة رقمك تلقائياً:', error.message);
