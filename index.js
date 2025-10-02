@@ -123,6 +123,51 @@ function getMentions(msg) {
 }
 
 /**
+ * تقسيم الرسائل الطويلة إلى أجزاء (حد Telegram: 4096 حرف)
+ */
+function splitLongMessage(text, maxLength = 4096) {
+    if (text.length <= maxLength) {
+        return [text];
+    }
+    
+    const chunks = [];
+    let currentChunk = '';
+    
+    // تقسيم النص إلى أسطر للحفاظ على التنسيق
+    const lines = text.split('\n');
+    
+    for (const line of lines) {
+        // إذا كان السطر نفسه أطول من الحد الأقصى، نقسمه
+        if (line.length > maxLength) {
+            // حفظ الجزء الحالي إذا كان موجوداً
+            if (currentChunk) {
+                chunks.push(currentChunk);
+                currentChunk = '';
+            }
+            
+            // تقسيم السطر الطويل إلى أجزاء
+            for (let i = 0; i < line.length; i += maxLength) {
+                chunks.push(line.substring(i, i + maxLength));
+            }
+        } else if ((currentChunk + '\n' + line).length > maxLength) {
+            // إذا كان إضافة السطر سيتجاوز الحد، نحفظ الجزء الحالي
+            chunks.push(currentChunk);
+            currentChunk = line;
+        } else {
+            // إضافة السطر إلى الجزء الحالي
+            currentChunk += (currentChunk ? '\n' : '') + line;
+        }
+    }
+    
+    // إضافة آخر جزء
+    if (currentChunk) {
+        chunks.push(currentChunk);
+    }
+    
+    return chunks;
+}
+
+/**
  * المعالج الرئيسي للرسائل الواردة
  */
 async function handleNewMessage(msg) {
@@ -234,14 +279,35 @@ async function handleNewMessage(msg) {
                     text + replyInfo + mentionInfo;
                 
                 try {
-                    const sentMsg = await telegramBot.telegram.sendMessage(
-                        targetChannel, 
-                        finalMessage, 
-                        { parse_mode: 'Markdown' }
-                    );
-                    messageCache.set(messageId, sentMsg.message_id);
-                    logTelegramMessage(targetChannel, messageType, true, sentMsg.message_id);
-                    console.log('✅ تم إرسال النص إلى Telegram');
+                    // تقسيم الرسالة إذا كانت طويلة جداً
+                    const messageChunks = splitLongMessage(finalMessage);
+                    let lastSentMsg;
+                    
+                    for (let i = 0; i < messageChunks.length; i++) {
+                        const chunk = messageChunks[i];
+                        const chunkPrefix = messageChunks.length > 1 ? `📄 (${i + 1}/${messageChunks.length})\n` : '';
+                        
+                        lastSentMsg = await telegramBot.telegram.sendMessage(
+                            targetChannel, 
+                            chunkPrefix + chunk, 
+                            { parse_mode: 'Markdown' }
+                        );
+                        
+                        // إضافة تأخير صغير بين الرسائل المتعددة لتجنب flood limits
+                        if (i < messageChunks.length - 1) {
+                            await new Promise(resolve => setTimeout(resolve, 100));
+                        }
+                    }
+                    
+                    // حفظ معرف آخر رسالة فقط
+                    messageCache.set(messageId, lastSentMsg.message_id);
+                    logTelegramMessage(targetChannel, messageType, true, lastSentMsg.message_id);
+                    
+                    if (messageChunks.length > 1) {
+                        console.log(`✅ تم إرسال النص إلى Telegram (${messageChunks.length} أجزاء)`);
+                    } else {
+                        console.log('✅ تم إرسال النص إلى Telegram');
+                    }
                     
                     // التحقق من التنبيهات الذكية
                     if (typeof text === 'string') {
