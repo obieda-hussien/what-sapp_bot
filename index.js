@@ -18,7 +18,8 @@ import {
     shouldFilterMessage,
     getTelegramChannel,
     loadConfig,
-    setBotStatus
+    setBotStatus,
+    CONFIG_PATH
 } from './utils/config.js';
 import { 
     logError, 
@@ -33,6 +34,14 @@ import { checkDueSchedules } from './plugins/alerts.js';
 import { generateDailyReport } from './plugins/reports.js';
 
 dotenv.config();
+
+// عرض معلومات بدء التشغيل
+console.log('\n╔════════════════════════════════════════════════════════════════════════════╗');
+console.log('║           🤖 WhatsApp to Telegram Bridge Bot - Starting...                ║');
+console.log('╚════════════════════════════════════════════════════════════════════════════╝\n');
+console.log(`📁 مجلد العمل: ${process.cwd()}`);
+console.log(`📝 ملف الإعدادات: ${CONFIG_PATH}`);
+console.log(`📂 ملف .env: ${process.env.TELEGRAM_BOT_TOKEN ? '✅ موجود' : '❌ غير موجود'}\n`);
 
 // --- إعدادات قابلة للتخصيص ---
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;

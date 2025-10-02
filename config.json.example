@@ -19,5 +19,11 @@
   "botStatus": {
     "active": true,
     "pausedGroups": []
-  }
+  },
+  "smartAlerts": {
+    "enabled": false,
+    "keywords": []
+  },
+  "schedules": [],
+  "admins": []
 }

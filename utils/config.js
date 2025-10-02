@@ -6,16 +6,62 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const CONFIG_PATH = path.join(__dirname, '..', 'config.json');
 
+// تصدير المسار للاستخدام في أماكن أخرى
+export { CONFIG_PATH };
+
 /**
  * قراءة ملف الإعدادات
  */
 export function loadConfig() {
     try {
+        // إذا كان الملف غير موجود، نقوم بإنشائه
+        if (!fs.existsSync(CONFIG_PATH)) {
+            console.log('📝 ملف config.json غير موجود، جاري إنشائه...');
+            console.log(`📍 المسار: ${CONFIG_PATH}`);
+            const defaultConfig = getDefaultConfig();
+            
+            // التأكد من وجود المجلد الأب
+            const configDir = path.dirname(CONFIG_PATH);
+            if (!fs.existsSync(configDir)) {
+                fs.mkdirSync(configDir, { recursive: true });
+            }
+            
+            fs.writeFileSync(CONFIG_PATH, JSON.stringify(defaultConfig, null, 2), 'utf8');
+            console.log('✅ تم إنشاء ملف config.json بنجاح');
+            return defaultConfig;
+        }
+        
         const data = fs.readFileSync(CONFIG_PATH, 'utf8');
-        return JSON.parse(data);
+        const config = JSON.parse(data);
+        
+        // دمج مع الإعدادات الافتراضية للتأكد من وجود جميع الحقول
+        const defaultConfig = getDefaultConfig();
+        const mergedConfig = { ...defaultConfig, ...config };
+        
+        // إضافة الحقول المفقودة
+        if (!mergedConfig.smartAlerts) mergedConfig.smartAlerts = defaultConfig.smartAlerts;
+        if (!mergedConfig.schedules) mergedConfig.schedules = defaultConfig.schedules;
+        if (!mergedConfig.admins) mergedConfig.admins = defaultConfig.admins;
+        
+        return mergedConfig;
     } catch (error) {
         console.error('❌ خطأ في قراءة ملف الإعدادات:', error.message);
-        return getDefaultConfig();
+        console.error('📍 المسار المتوقع:', CONFIG_PATH);
+        const defaultConfig = getDefaultConfig();
+        // محاولة إنشاء الملف حتى في حالة الخطأ
+        try {
+            const configDir = path.dirname(CONFIG_PATH);
+            if (!fs.existsSync(configDir)) {
+                fs.mkdirSync(configDir, { recursive: true });
+                console.log('✅ تم إنشاء المجلد:', configDir);
+            }
+            fs.writeFileSync(CONFIG_PATH, JSON.stringify(defaultConfig, null, 2), 'utf8');
+            console.log('✅ تم إنشاء ملف الإعدادات الافتراضي بنجاح');
+        } catch (writeError) {
+            console.error('❌ فشل إنشاء ملف الإعدادات:', writeError.message);
+            console.error('💡 نصيحة: تأكد من صلاحيات الكتابة في المجلد');
+        }
+        return defaultConfig;
     }
 }
 
@@ -49,7 +95,13 @@ function getDefaultConfig() {
         botStatus: {
             active: true,
             pausedGroups: []
-        }
+        },
+        smartAlerts: {
+            enabled: false,
+            keywords: []
+        },
+        schedules: [],
+        admins: []
     };
 }
 
