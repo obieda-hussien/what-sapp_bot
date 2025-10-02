@@ -134,7 +134,11 @@ async function handleNewMessage(msg) {
     
     // استخراج نوع الرسالة مع تجاهل الرسائل البروتوكولية
     const messageKeys = Object.keys(msg.message);
-    const protocolMessages = ['senderKeyDistributionMessage', 'messageContextInfo'];
+    const protocolMessages = [
+        'senderKeyDistributionMessage', 
+        'messageContextInfo',
+        'associatedChildMessage'  // رسالة مرتبطة - تظهر مع الردود على الوسائط
+    ];
     const actualMessageKey = messageKeys.find(key => !protocolMessages.includes(key));
     
     if (!actualMessageKey) {
