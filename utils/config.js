@@ -20,6 +20,15 @@ export function loadConfig() {
             console.log(`📍 المسار: ${CONFIG_PATH}`);
             const defaultConfig = getDefaultConfig();
             
+            // إضافة OWNER_PHONE من .env إلى eliteUsers تلقائياً
+            if (process.env.OWNER_PHONE) {
+                const ownerPhone = process.env.OWNER_PHONE.replace(/\D/g, '');
+                if (ownerPhone && !defaultConfig.eliteUsers.includes(ownerPhone)) {
+                    defaultConfig.eliteUsers.push(ownerPhone);
+                    console.log(`✅ تم إضافة المالك (${ownerPhone}) تلقائياً إلى قائمة النخبة`);
+                }
+            }
+            
             // التأكد من وجود المجلد الأب
             const configDir = path.dirname(CONFIG_PATH);
             if (!fs.existsSync(configDir)) {
@@ -43,11 +52,32 @@ export function loadConfig() {
         if (!mergedConfig.schedules) mergedConfig.schedules = defaultConfig.schedules;
         if (!mergedConfig.admins) mergedConfig.admins = defaultConfig.admins;
         
+        // إضافة OWNER_PHONE من .env إلى eliteUsers إذا لم يكن موجوداً
+        if (process.env.OWNER_PHONE) {
+            const ownerPhone = process.env.OWNER_PHONE.replace(/\D/g, '');
+            if (ownerPhone && !mergedConfig.eliteUsers.includes(ownerPhone)) {
+                mergedConfig.eliteUsers.push(ownerPhone);
+                console.log(`✅ تم إضافة المالك (${ownerPhone}) تلقائياً إلى قائمة النخبة`);
+                // حفظ التحديث
+                saveConfig(mergedConfig);
+            }
+        }
+        
         return mergedConfig;
     } catch (error) {
         console.error('❌ خطأ في قراءة ملف الإعدادات:', error.message);
         console.error('📍 المسار المتوقع:', CONFIG_PATH);
         const defaultConfig = getDefaultConfig();
+        
+        // إضافة OWNER_PHONE من .env
+        if (process.env.OWNER_PHONE) {
+            const ownerPhone = process.env.OWNER_PHONE.replace(/\D/g, '');
+            if (ownerPhone && !defaultConfig.eliteUsers.includes(ownerPhone)) {
+                defaultConfig.eliteUsers.push(ownerPhone);
+                console.log(`✅ تم إضافة المالك (${ownerPhone}) تلقائياً إلى قائمة النخبة`);
+            }
+        }
+        
         // محاولة إنشاء الملف حتى في حالة الخطأ
         try {
             const configDir = path.dirname(CONFIG_PATH);

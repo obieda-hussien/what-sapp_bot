@@ -35,13 +35,23 @@ import { generateDailyReport } from './plugins/reports.js';
 
 dotenv.config();
 
+// تحميل الإعدادات مبكراً
+const initialConfig = loadConfig();
+
 // عرض معلومات بدء التشغيل
 console.log('\n╔════════════════════════════════════════════════════════════════════════════╗');
 console.log('║           🤖 WhatsApp to Telegram Bridge Bot - Starting...                ║');
 console.log('╚════════════════════════════════════════════════════════════════════════════╝\n');
 console.log(`📁 مجلد العمل: ${process.cwd()}`);
 console.log(`📝 ملف الإعدادات: ${CONFIG_PATH}`);
-console.log(`📂 ملف .env: ${process.env.TELEGRAM_BOT_TOKEN ? '✅ موجود' : '❌ غير موجود'}\n`);
+console.log(`📂 ملف .env: ${process.env.TELEGRAM_BOT_TOKEN ? '✅ موجود' : '❌ غير موجود'}`);
+console.log(`👥 عدد النخبة: ${initialConfig.eliteUsers.length}`);
+if (initialConfig.eliteUsers.length > 0) {
+    console.log(`   📱 النخبة: ${initialConfig.eliteUsers.join(', ')}`);
+} else {
+    console.log(`   ⚠️  تحذير: لا يوجد مستخدمين نخبة! أضف OWNER_PHONE في .env`);
+}
+console.log('');
 
 // --- إعدادات قابلة للتخصيص ---
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
@@ -149,11 +159,16 @@ async function handleNewMessage(msg) {
         // معالجة الأوامر للمستخدمين من النخبة
         const text = messageContent.text || messageContent;
         if (typeof text === 'string' && isCommand(text)) {
+            console.log(`\n⚡ تم اكتشاف أمر: ${text}`);
             const result = await handleCommand(msg, sock, telegramBot);
             if (result && result.handled && result.response) {
                 // إرسال الرد على WhatsApp
                 await sock.sendMessage(groupJid, { text: result.response });
                 console.log('✅ تم إرسال رد الأمر');
+            } else if (result && result.handled) {
+                console.log('✅ تم معالجة الأمر بدون رد');
+            } else {
+                console.log('⚠️ الأمر لم يتم معالجته');
             }
             return; // لا نقوم بنقل الأوامر إلى Telegram
         }

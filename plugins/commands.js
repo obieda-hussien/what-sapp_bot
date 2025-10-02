@@ -75,15 +75,24 @@ export async function handleCommand(msg, sock, telegramBot) {
     const senderJid = msg.key.remoteJid;
     const senderPhone = msg.key.participant?.split('@')[0] || msg.key.remoteJid?.split('@')[0];
     
+    console.log(`\n🔧 أمر مستلم: "${text}"`);
+    console.log(`📱 من: ${senderPhone}`);
+    
     // التحقق من صلاحيات النخبة
     if (!isEliteUser(senderPhone)) {
+        console.log(`⛔ المستخدم ${senderPhone} ليس من النخبة`);
+        const config = loadConfig();
+        console.log(`📋 قائمة النخبة الحالية: ${config.eliteUsers.length > 0 ? config.eliteUsers.join(', ') : 'فارغة!'}`);
+        console.log(`💡 نصيحة: أضف رقمك إلى OWNER_PHONE في ملف .env أو استخدم .اضافة_نخبة من مستخدم نخبة آخر`);
         return {
             handled: true,
-            response: '⛔ عذراً، هذا الأمر متاح فقط لمستخدمي النخبة'
+            response: '⛔ عذراً، هذا الأمر متاح فقط لمستخدمي النخبة\n\n💡 للحصول على صلاحيات:\n1. أضف رقمك في ملف .env (OWNER_PHONE)\n2. أو اطلب من مستخدم نخبة إضافتك'
         };
     }
 
+    console.log(`✅ المستخدم ${senderPhone} من النخبة - معالجة الأمر...`);
     const { command, args } = parseCommand(text);
+    console.log(`📝 الأمر: ${command}، المعاملات: ${args.join(' ')}`);
     
     try {
         switch (command) {
