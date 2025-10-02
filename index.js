@@ -287,11 +287,25 @@ async function handleNewMessage(msg) {
                         const chunk = messageChunks[i];
                         const chunkPrefix = messageChunks.length > 1 ? `📄 (${i + 1}/${messageChunks.length})\n` : '';
                         
-                        lastSentMsg = await telegramBot.telegram.sendMessage(
-                            targetChannel, 
-                            chunkPrefix + chunk, 
-                            { parse_mode: 'Markdown' }
-                        );
+                        try {
+                            // محاولة الإرسال مع Markdown
+                            lastSentMsg = await telegramBot.telegram.sendMessage(
+                                targetChannel, 
+                                chunkPrefix + chunk, 
+                                { parse_mode: 'Markdown' }
+                            );
+                        } catch (parseError) {
+                            // إذا فشل Markdown، نعيد المحاولة بدون parse_mode
+                            if (parseError.message && parseError.message.includes("can't parse entities")) {
+                                console.log('⚠️ فشل تحليل Markdown، إعادة المحاولة بدون تنسيق');
+                                lastSentMsg = await telegramBot.telegram.sendMessage(
+                                    targetChannel, 
+                                    chunkPrefix + chunk
+                                );
+                            } else {
+                                throw parseError;
+                            }
+                        }
                         
                         // إضافة تأخير صغير بين الرسائل المتعددة لتجنب flood limits
                         if (i < messageChunks.length - 1) {
@@ -315,7 +329,13 @@ async function handleNewMessage(msg) {
                         if (alert) {
                             // إرسال تنبيه
                             for (const notifyChannel of alert.channels) {
-                                await telegramBot.telegram.sendMessage(notifyChannel, alert.message, { parse_mode: 'Markdown' });
+                                try {
+                                    await telegramBot.telegram.sendMessage(notifyChannel, alert.message, { parse_mode: 'Markdown' });
+                                } catch (alertError) {
+                                    if (alertError.message && alertError.message.includes("can't parse entities")) {
+                                        await telegramBot.telegram.sendMessage(notifyChannel, alert.message);
+                                    }
+                                }
                             }
                         }
                     }
