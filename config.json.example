@@ -1,0 +1,29 @@
+{
+  "bridges": [
+    {
+      "whatsapp": "120363123456789012@g.us",
+      "telegram": "@your_channel",
+      "enabled": true
+    }
+  ],
+  "eliteUsers": [
+    "201234567890"
+  ],
+  "filters": {
+    "enabled": false,
+    "blacklist": [],
+    "whitelist": [],
+    "keywords": [],
+    "allowedTypes": []
+  },
+  "botStatus": {
+    "active": true,
+    "pausedGroups": []
+  },
+  "smartAlerts": {
+    "enabled": false,
+    "keywords": []
+  },
+  "schedules": [],
+  "admins": []
+}

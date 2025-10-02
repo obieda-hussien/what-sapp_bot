@@ -11,8 +11,49 @@ import pino from 'pino';
 import dotenv from 'dotenv';
 import readline from 'readline';
 import NodeCache from 'node-cache';
+import { handleCommand, isCommand } from './plugins/commands.js';
+import { 
+    isBotActive, 
+    isGroupPaused, 
+    shouldFilterMessage,
+    getTelegramChannel,
+    loadConfig,
+    setBotStatus,
+    CONFIG_PATH,
+    savePhoneToEnv,
+    saveConfig
+} from './utils/config.js';
+import { 
+    logError, 
+    logWarning, 
+    logWhatsAppMessage, 
+    logTelegramMessage, 
+    logFailedTransfer,
+    logBotStatus 
+} from './utils/logger.js';
+import { checkSmartAlerts } from './plugins/alerts.js';
+import { checkDueSchedules } from './plugins/alerts.js';
+import { generateDailyReport } from './plugins/reports.js';
 
 dotenv.config();
+
+// تحميل الإعدادات مبكراً
+const initialConfig = loadConfig();
+
+// عرض معلومات بدء التشغيل
+console.log('\n╔════════════════════════════════════════════════════════════╗');
+console.log('║           🤖 WhatsApp to Telegram Bridge Bot - Starting...                ║');
+console.log('╚════════════════════════════════════════════════════════════╝');
+console.log(`📁 مجلد العمل: ${process.cwd()}`);
+console.log(`📝 ملف الإعدادات: ${CONFIG_PATH}`);
+console.log(`📂 ملف .env: ${process.env.TELEGRAM_BOT_TOKEN ? '✅ موجود' : '❌ غير موجود'}`);
+console.log(`👥 عدد النخبة: ${initialConfig.eliteUsers.length}`);
+if (initialConfig.eliteUsers.length > 0) {
+    console.log(`   📱 النخبة: ${initialConfig.eliteUsers.join(', ')}`);
+} else {
+    console.log(`   ⚠️  تحذير: لا يوجد مستخدمين نخبة! أضف OWNER_PHONE في .env`);
+}
+console.log('');
 
 // --- إعدادات قابلة للتخصيص ---
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
@@ -85,16 +126,100 @@ function getMentions(msg) {
  * المعالج الرئيسي للرسائل الواردة
  */
 async function handleNewMessage(msg) {
-    if (!msg.message || msg.key.remoteJid !== WHATSAPP_GROUP_JID) return;
-
+    if (!msg.message) return;
+    
+    const groupJid = msg.key.remoteJid;
     const senderName = msg.pushName || 'غير معروف';
     const messageId = msg.key.id;
+    const senderPhone = msg.key.participant?.split('@')[0] || msg.key.remoteJid?.split('@')[0];
+    
+    // استخراج نوع الرسالة مع تجاهل الرسائل البروتوكولية
+    const messageKeys = Object.keys(msg.message);
+    const protocolMessages = [
+        'senderKeyDistributionMessage', 
+        'messageContextInfo',
+        'associatedChildMessage'  // رسالة مرتبطة - تظهر مع الردود على الوسائط
+    ];
+    const actualMessageKey = messageKeys.find(key => !protocolMessages.includes(key));
+    
+    if (!actualMessageKey) {
+        return; // رسالة بروتوكولية فقط
+    }
+    
+    const messageType = actualMessageKey;
+    const messageContent = msg.message[messageType];
+    
+    // معالجة الأوامر من أي محادثة (جروب، خاص، إلخ)
+    const text = messageContent.text || messageContent;
+    if (typeof text === 'string' && isCommand(text)) {
+        console.log(`\n📨 رسالة جديدة من ${senderName} (ID: ${messageId})`);
+        console.log(`⚡ تم اكتشاف أمر: ${text}`);
+        
+        const result = await handleCommand(msg, sock, telegramBot);
+        if (result && result.handled && result.response) {
+            // إرسال الرد على WhatsApp في نفس المحادثة
+            await sock.sendMessage(groupJid, { text: result.response });
+            console.log('✅ تم إرسال رد الأمر');
+        } else if (result && result.handled) {
+            console.log('✅ تم معالجة الأمر بدون رد');
+        }
+        return; // لا نقوم بنقل الأوامر إلى Telegram
+    }
+    
+    // دعم الجسور المتعددة - التحقق من أي جروب مسجل
+    const config = loadConfig();
+    
+    // إذا كان هناك WHATSAPP_GROUP_JID في .env، نستخدمه
+    // وإلا، نتحقق من config.json
+    const isFromMonitoredGroup = WHATSAPP_GROUP_JID ? 
+        groupJid === WHATSAPP_GROUP_JID : 
+        config.bridges.some(b => b.whatsapp === groupJid);
+    
+    // إذا لم تكن الرسالة من جروب مراقب، نتجاهلها (ما عدا الأوامر)
+    if (!isFromMonitoredGroup) return;
     
     console.log(`\n📨 رسالة جديدة من ${senderName} (ID: ${messageId})`);
 
+    // متغير لحفظ محتوى النص للاستخدام في catch block
+    let textContent = '';
+
     try {
-        const messageType = Object.keys(msg.message)[0];
-        const messageContent = msg.message[messageType];
+        // التحقق من حالة البوت
+        if (!isBotActive()) {
+            console.log('⏸️ البوت متوقف - تم تجاهل الرسالة');
+            return;
+        }
+
+        // التحقق من حالة الجروب
+        if (isGroupPaused(groupJid)) {
+            console.log('⏸️ الجروب متوقف مؤقتاً - تم تجاهل الرسالة');
+            return;
+        }
+
+        // إعادة تحديد text للرسائل غير الأوامر
+        const text = messageContent.text || messageContent;
+        
+        // تطبيق الفلاتر
+        if (shouldFilterMessage(senderPhone, text, messageType)) {
+            console.log('🔍 تم فلترة الرسالة');
+            return;
+        }
+
+        // تحديد القناة المستهدفة
+        const config = loadConfig();
+        let targetChannel = TELEGRAM_CHANNEL_ID;
+        if (!targetChannel) {
+            targetChannel = getTelegramChannel(groupJid);
+            if (!targetChannel) {
+                logWarning(`لا توجد قناة مرتبطة بالجروب: ${groupJid}`);
+                console.log('⚠️ لا توجد قناة مرتبطة بهذا الجروب');
+                return;
+            }
+        }
+
+        // تسجيل رسالة واتساب وحفظ محتوى النص
+        textContent = typeof text === 'string' ? text : JSON.stringify(messageContent).substring(0, 100);
+        logWhatsAppMessage(senderName, senderPhone, groupJid, messageType, textContent);
 
         // استخراج معلومات إضافية
         const replyInfo = getQuotedInfo(msg);
@@ -103,18 +228,36 @@ async function handleNewMessage(msg) {
         switch (messageType) {
             case 'conversation':
             case 'extendedTextMessage':
-                const text = messageContent.text || messageContent;
                 const finalMessage = FORWARD_SENDER_NAME ? 
                     buildCaption(senderName, text) + replyInfo + mentionInfo : 
                     text + replyInfo + mentionInfo;
                 
-                const sentMsg = await telegramBot.telegram.sendMessage(
-                    TELEGRAM_CHANNEL_ID, 
-                    finalMessage, 
-                    { parse_mode: 'Markdown' }
-                );
-                messageCache.set(messageId, sentMsg.message_id);
-                console.log('✅ تم إرسال النص إلى Telegram');
+                try {
+                    const sentMsg = await telegramBot.telegram.sendMessage(
+                        targetChannel, 
+                        finalMessage, 
+                        { parse_mode: 'Markdown' }
+                    );
+                    messageCache.set(messageId, sentMsg.message_id);
+                    logTelegramMessage(targetChannel, messageType, true, sentMsg.message_id);
+                    console.log('✅ تم إرسال النص إلى Telegram');
+                    
+                    // التحقق من التنبيهات الذكية
+                    if (typeof text === 'string') {
+                        const alert = checkSmartAlerts(text, senderName, targetChannel);
+                        if (alert) {
+                            // إرسال تنبيه
+                            for (const notifyChannel of alert.channels) {
+                                await telegramBot.telegram.sendMessage(notifyChannel, alert.message, { parse_mode: 'Markdown' });
+                            }
+                        }
+                    }
+                } catch (error) {
+                    logFailedTransfer(senderName, senderPhone, messageType, error.message, textContent);
+                    logTelegramMessage(targetChannel, messageType, false);
+                    logError('فشل إرسال رسالة نصية', error);
+                    throw error;
+                }
                 break;
 
             case 'imageMessage':
@@ -128,11 +271,11 @@ async function handleNewMessage(msg) {
                     + replyInfo + mentionInfo;
                 
                 const mediaSent = isVideo ? 
-                    await telegramBot.telegram.sendVideo(TELEGRAM_CHANNEL_ID, { source: stream }, { 
+                    await telegramBot.telegram.sendVideo(targetChannel, { source: stream }, { 
                         caption: captionText || undefined, 
                         parse_mode: 'Markdown' 
                     }) :
-                    await telegramBot.telegram.sendPhoto(TELEGRAM_CHANNEL_ID, { source: stream }, { 
+                    await telegramBot.telegram.sendPhoto(targetChannel, { source: stream }, { 
                         caption: captionText || undefined, 
                         parse_mode: 'Markdown' 
                     });
@@ -150,7 +293,7 @@ async function handleNewMessage(msg) {
                     + replyInfo + mentionInfo;
                 
                 const docSent = await telegramBot.telegram.sendDocument(
-                    TELEGRAM_CHANNEL_ID, 
+                    targetChannel, 
                     { source: docStream, filename: messageContent.fileName || 'document' }, 
                     { caption: docCaption || undefined, parse_mode: 'Markdown' }
                 );
@@ -166,7 +309,7 @@ async function handleNewMessage(msg) {
                 const audioCaption = buildCaption(senderName, '', '🎵 رسالة صوتية') + replyInfo;
                 
                 const audioSent = await telegramBot.telegram.sendAudio(
-                    TELEGRAM_CHANNEL_ID, 
+                    targetChannel, 
                     { source: audioStream }, 
                     { caption: audioCaption || undefined, parse_mode: 'Markdown' }
                 );
@@ -179,24 +322,39 @@ async function handleNewMessage(msg) {
                     logger, 
                     reuploadRequest: sock.updateMediaMessage 
                 });
-                const stickerSent = await telegramBot.telegram.sendSticker(TELEGRAM_CHANNEL_ID, { source: stickerStream });
+                const stickerSent = await telegramBot.telegram.sendSticker(targetChannel, { source: stickerStream });
                 messageCache.set(messageId, stickerSent.message_id);
                 console.log('✅ تم إرسال الملصق إلى Telegram');
                 break;
 
             case 'pollCreationMessage':
+            case 'pollCreationMessageV2':
+            case 'pollCreationMessageV3':
                 const poll = messageContent;
                 const pollQuestion = buildCaption(senderName, poll.name, '📊');
                 const pollOptions = poll.options.map(opt => opt.optionName);
                 
-                const pollSent = await telegramBot.telegram.sendPoll(
-                    TELEGRAM_CHANNEL_ID, 
-                    pollQuestion || 'تصويت', 
-                    pollOptions, 
-                    { is_anonymous: false }
-                );
-                messageCache.set(messageId, pollSent.message_id);
-                console.log('✅ تم إرسال التصويت إلى Telegram');
+                try {
+                    const pollSent = await telegramBot.telegram.sendPoll(
+                        targetChannel, 
+                        pollQuestion || 'تصويت', 
+                        pollOptions, 
+                        { is_anonymous: true } // تغيير إلى true للتوافق مع القنوات
+                    );
+                    messageCache.set(messageId, pollSent.message_id);
+                    console.log('✅ تم إرسال التصويت إلى Telegram');
+                } catch (pollError) {
+                    // إذا فشل إرسال التصويت، نرسله كرسالة نصية
+                    console.log('⚠️ لا يمكن إرسال التصويت، سيتم إرساله كنص');
+                    const pollText = `📊 *تصويت من ${senderName}*\n\n*${poll.name}*\n\nالخيارات:\n${pollOptions.map((opt, i) => `${i + 1}. ${opt}`).join('\n')}`;
+                    const pollTextSent = await telegramBot.telegram.sendMessage(
+                        targetChannel, 
+                        pollText, 
+                        { parse_mode: 'Markdown' }
+                    );
+                    messageCache.set(messageId, pollTextSent.message_id);
+                    console.log('✅ تم إرسال التصويت كنص إلى Telegram');
+                }
                 break;
 
             case 'contactMessage':
@@ -208,7 +366,7 @@ async function handleNewMessage(msg) {
                 );
                 
                 const contactSent = await telegramBot.telegram.sendMessage(
-                    TELEGRAM_CHANNEL_ID, 
+                    targetChannel, 
                     contactText, 
                     { parse_mode: 'Markdown' }
                 );
@@ -223,15 +381,17 @@ async function handleNewMessage(msg) {
                     location.name ? `📍 *الموقع:* ${location.name}` : '📍 *موقع جغرافي*'
                 );
                 
-                await telegramBot.telegram.sendLocation(
-                    TELEGRAM_CHANNEL_ID, 
+                const locationSent = await telegramBot.telegram.sendLocation(
+                    targetChannel, 
                     location.degreesLatitude, 
                     location.degreesLongitude
                 );
                 
+                messageCache.set(messageId, locationSent.message_id);
+                
                 if (locationText) {
                     await telegramBot.telegram.sendMessage(
-                        TELEGRAM_CHANNEL_ID, 
+                        targetChannel, 
                         locationText, 
                         { parse_mode: 'Markdown' }
                     );
@@ -246,14 +406,16 @@ async function handleNewMessage(msg) {
                     `📍 *موقع مباشر (Live Location)*\n⏱️ المدة: ${liveLocation.seconds || 'غير محددة'} ثانية`
                 );
                 
-                await telegramBot.telegram.sendLocation(
-                    TELEGRAM_CHANNEL_ID, 
+                const liveLocationSent = await telegramBot.telegram.sendLocation(
+                    targetChannel, 
                     liveLocation.degreesLatitude, 
                     liveLocation.degreesLongitude
                 );
                 
+                messageCache.set(messageId, liveLocationSent.message_id);
+                
                 await telegramBot.telegram.sendMessage(
-                    TELEGRAM_CHANNEL_ID, 
+                    targetChannel, 
                     liveLocationText, 
                     { parse_mode: 'Markdown' }
                 );
@@ -266,7 +428,7 @@ async function handleNewMessage(msg) {
                     const emoji = reaction.text || '❤️';
                     const reactionText = buildCaption(senderName, `تفاعل بـ ${emoji}`);
                     await telegramBot.telegram.sendMessage(
-                        TELEGRAM_CHANNEL_ID, 
+                        targetChannel, 
                         reactionText, 
                         { parse_mode: 'Markdown' }
                     );
@@ -282,11 +444,11 @@ async function handleNewMessage(msg) {
                     
                     if (telegramMsgId) {
                         try {
-                            await telegramBot.telegram.deleteMessage(TELEGRAM_CHANNEL_ID, telegramMsgId);
+                            await telegramBot.telegram.deleteMessage(targetChannel, telegramMsgId);
                             console.log('🗑️ تم حذف الرسالة من Telegram');
                         } catch (e) {
                             await telegramBot.telegram.sendMessage(
-                                TELEGRAM_CHANNEL_ID, 
+                                targetChannel, 
                                 '🗑️ *تم حذف رسالة من الواتساب*', 
                                 { parse_mode: 'Markdown' }
                             );
@@ -298,10 +460,13 @@ async function handleNewMessage(msg) {
 
             default:
                 console.log(`⚠️ تجاهل نوع الرسالة غير المدعوم: ${messageType}`);
+                logWarning(`نوع رسالة غير مدعوم: ${messageType} من ${senderName}`);
                 break;
         }
     } catch (error) {
         console.error('❌ خطأ في معالجة الرسالة:', error.message);
+        logError(`خطأ في معالجة رسالة من ${senderName}`, error);
+        logFailedTransfer(senderName, senderPhone, messageType, error.message, textContent);
     }
 }
 
@@ -313,9 +478,19 @@ async function handleMessageUpdate(updates) {
 
     try {
         const updatesArray = Array.isArray(updates) ? updates : [updates];
+        const config = loadConfig();
 
         for (const update of updatesArray) {
-            if (!update.key || update.key.remoteJid !== WHATSAPP_GROUP_JID) continue;
+            if (!update.key) continue;
+            
+            const groupJid = update.key.remoteJid;
+            
+            // التحقق من أن الجروب مراقب
+            const isFromMonitoredGroup = WHATSAPP_GROUP_JID ? 
+                groupJid === WHATSAPP_GROUP_JID : 
+                config.bridges.some(b => b.whatsapp === groupJid);
+            
+            if (!isFromMonitoredGroup) continue;
 
             const messageId = update.key.id;
             
@@ -323,26 +498,42 @@ async function handleMessageUpdate(updates) {
                 const telegramMsgId = messageCache.get(messageId);
                 
                 if (telegramMsgId) {
+                    // تحديد القناة المستهدفة
+                    let targetChannel = TELEGRAM_CHANNEL_ID;
+                    if (!targetChannel) {
+                        targetChannel = getTelegramChannel(groupJid);
+                    }
+                    
+                    if (!targetChannel) continue;
+                    
                     try {
-                        await telegramBot.telegram.deleteMessage(TELEGRAM_CHANNEL_ID, telegramMsgId);
+                        await telegramBot.telegram.deleteMessage(targetChannel, telegramMsgId);
                         console.log('✏️ تم حذف النسخة القديمة من Telegram');
                     } catch (e) {
                         console.log('⚠️ لم يتم العثور على الرسالة القديمة للحذف');
                     }
                     
+                    // إنشاء رسالة محدثة مع الحفاظ على جميع المعلومات الضرورية
                     const updatedMsg = {
-                        key: update.key,
+                        key: {
+                            ...update.key,
+                            remoteJid: groupJid, // تأكد من وجود remoteJid
+                            id: messageId
+                        },
                         message: update.update.message,
-                        pushName: update.pushName || 'غير معروف'
+                        pushName: update.pushName || 'غير معروف',
+                        messageTimestamp: update.messageTimestamp || Date.now()
                     };
                     
+                    // إرسال الرسالة المعدلة
                     await handleNewMessage(updatedMsg);
-                    console.log('✅ تم إرسال النسخة المعدلة');
+                    console.log('✅ تم إرسال النسخة المعدلة إلى Telegram');
                 }
             }
         }
     } catch (error) {
         console.error('❌ خطأ في معالجة تحديث الرسالة:', error.message);
+        logError('خطأ في معالجة تحديث رسالة', error);
     }
 }
 
@@ -416,6 +607,49 @@ async function connectToWhatsApp() {
             console.log('║     ✅ تم الاتصال بواتساب بنجاح!              ║');
             console.log('╚════════════════════════════════════════════════╝\n');
             
+            // إضافة الرقم المسجل تلقائياً إلى النخبة
+            try {
+                const me = sock.user;
+                if (me && me.id) {
+                    const myPhone = me.id.split(':')[0].replace(/\D/g, '');
+                    const myLid = me.lid || null;
+                    
+                    const config = loadConfig();
+                    let updated = false;
+                    
+                    // إضافة رقم الهاتف إلى النخبة
+                    if (myPhone && !config.eliteUsers.includes(myPhone)) {
+                        config.eliteUsers.push(myPhone);
+                        updated = true;
+                        console.log(`✅ تم إضافة رقمك (${myPhone}) تلقائياً إلى قائمة النخبة`);
+                    }
+                    
+                    // إضافة LID إلى النخبة إذا كان متوفراً
+                    if (myLid && !config.eliteUsers.includes(myLid)) {
+                        config.eliteUsers.push(myLid);
+                        updated = true;
+                        console.log(`✅ تم إضافة LID (${myLid}) تلقائياً إلى قائمة النخبة`);
+                    }
+                    
+                    // حفظ التحديثات في config.json
+                    if (updated) {
+                        saveConfig(config);
+                        console.log('💾 تم حفظ بياناتك في config.json');
+                    }
+                    
+                    // حفظ الرقم في ملف .env
+                    if (myPhone) {
+                        savePhoneToEnv(myPhone, myLid);
+                        console.log('💾 تم حفظ رقمك في ملف .env');
+                    }
+                    
+                    console.log('\n🎉 يمكنك الآن استخدام جميع الأوامر من أي محادثة في الواتس!');
+                    console.log('💡 جرب: .تست أو .المساعدة\n');
+                }
+            } catch (error) {
+                console.error('⚠️ تحذير: لم نستطع إضافة رقمك تلقائياً:', error.message);
+            }
+            
             // عرض جميع المجموعات عند الاتصال الناجح
             await displayAllGroups();
         }
@@ -447,11 +681,53 @@ async function connectToWhatsApp() {
 
 // --- تشغيل البوت ---
 telegramBot.launch()
-    .then(() => console.log('🤖 Telegram Bot شغال!'))
-    .catch(err => console.error('❌ فشل تشغيل Telegram Bot:', err));
+    .then(() => {
+        console.log('🤖 Telegram Bot شغال!');
+        logBotStatus('started', 'Telegram bot launched successfully');
+    })
+    .catch(err => {
+        console.error('❌ فشل تشغيل Telegram Bot:', err);
+        logError('فشل تشغيل Telegram Bot', err);
+    });
 
 connectToWhatsApp()
-    .catch(err => console.error('❌ فشل الاتصال الأولي بـ WhatsApp:', err));
+    .then(() => {
+        logBotStatus('started', 'WhatsApp connection established');
+    })
+    .catch(err => {
+        console.error('❌ فشل الاتصال الأولي بـ WhatsApp:', err);
+        logError('فشل الاتصال الأولي بـ WhatsApp', err);
+    });
+
+// فحص الجداول الزمنية كل دقيقة
+setInterval(async () => {
+    try {
+        const dueSchedules = checkDueSchedules();
+        for (const schedule of dueSchedules) {
+            console.log(`⏰ تنفيذ جدول زمني: ${schedule.name}`);
+            
+            switch (schedule.action) {
+                case 'stop':
+                    setBotStatus(false);
+                    logBotStatus('stopped', 'Scheduled stop');
+                    break;
+                case 'start':
+                    setBotStatus(true);
+                    logBotStatus('started', 'Scheduled start');
+                    break;
+                case 'report':
+                    // إرسال تقرير يومي
+                    const report = generateDailyReport();
+                    if (TELEGRAM_CHANNEL_ID) {
+                        await telegramBot.telegram.sendMessage(TELEGRAM_CHANNEL_ID, report, { parse_mode: 'Markdown' });
+                    }
+                    break;
+            }
+        }
+    } catch (error) {
+        logError('خطأ في فحص الجداول الزمنية', error);
+    }
+}, 60000); // كل دقيقة
 
 process.on('SIGINT', () => {
     console.log('\n⏹️ إيقاف البوت...');
