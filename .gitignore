@@ -13,6 +13,7 @@ auth_info_baileys/
 config.json
 
 # Logs
+logs/
 *.log
 npm-debug.log*
 

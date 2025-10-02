@@ -17,8 +17,20 @@ import {
     isGroupPaused, 
     shouldFilterMessage,
     getTelegramChannel,
-    loadConfig
+    loadConfig,
+    setBotStatus
 } from './utils/config.js';
+import { 
+    logError, 
+    logWarning, 
+    logWhatsAppMessage, 
+    logTelegramMessage, 
+    logFailedTransfer,
+    logBotStatus 
+} from './utils/logger.js';
+import { checkSmartAlerts } from './plugins/alerts.js';
+import { checkDueSchedules } from './plugins/alerts.js';
+import { generateDailyReport } from './plugins/reports.js';
 
 dotenv.config();
 
@@ -160,10 +172,15 @@ async function handleNewMessage(msg) {
         if (!targetChannel) {
             targetChannel = getTelegramChannel(groupJid);
             if (!targetChannel) {
+                logWarning(`لا توجد قناة مرتبطة بالجروب: ${groupJid}`);
                 console.log('⚠️ لا توجد قناة مرتبطة بهذا الجروب');
                 return;
             }
         }
+
+        // تسجيل رسالة واتساب
+        const textContent = typeof text === 'string' ? text : JSON.stringify(messageContent).substring(0, 100);
+        logWhatsAppMessage(senderName, senderPhone, groupJid, messageType, textContent);
 
         // استخراج معلومات إضافية
         const replyInfo = getQuotedInfo(msg);
@@ -176,13 +193,32 @@ async function handleNewMessage(msg) {
                     buildCaption(senderName, text) + replyInfo + mentionInfo : 
                     text + replyInfo + mentionInfo;
                 
-                const sentMsg = await telegramBot.telegram.sendMessage(
-                    targetChannel, 
-                    finalMessage, 
-                    { parse_mode: 'Markdown' }
-                );
-                messageCache.set(messageId, sentMsg.message_id);
-                console.log('✅ تم إرسال النص إلى Telegram');
+                try {
+                    const sentMsg = await telegramBot.telegram.sendMessage(
+                        targetChannel, 
+                        finalMessage, 
+                        { parse_mode: 'Markdown' }
+                    );
+                    messageCache.set(messageId, sentMsg.message_id);
+                    logTelegramMessage(targetChannel, messageType, true, sentMsg.message_id);
+                    console.log('✅ تم إرسال النص إلى Telegram');
+                    
+                    // التحقق من التنبيهات الذكية
+                    if (typeof text === 'string') {
+                        const alert = checkSmartAlerts(text, senderName, targetChannel);
+                        if (alert) {
+                            // إرسال تنبيه
+                            for (const notifyChannel of alert.channels) {
+                                await telegramBot.telegram.sendMessage(notifyChannel, alert.message, { parse_mode: 'Markdown' });
+                            }
+                        }
+                    }
+                } catch (error) {
+                    logFailedTransfer(senderName, senderPhone, messageType, error.message, text);
+                    logTelegramMessage(targetChannel, messageType, false);
+                    logError('فشل إرسال رسالة نصية', error);
+                    throw error;
+                }
                 break;
 
             case 'imageMessage':
@@ -366,10 +402,13 @@ async function handleNewMessage(msg) {
 
             default:
                 console.log(`⚠️ تجاهل نوع الرسالة غير المدعوم: ${messageType}`);
+                logWarning(`نوع رسالة غير مدعوم: ${messageType} من ${senderName}`);
                 break;
         }
     } catch (error) {
         console.error('❌ خطأ في معالجة الرسالة:', error.message);
+        logError(`خطأ في معالجة رسالة من ${senderName}`, error);
+        logFailedTransfer(senderName, senderPhone, messageType, error.message, textContent);
     }
 }
 
@@ -515,11 +554,53 @@ async function connectToWhatsApp() {
 
 // --- تشغيل البوت ---
 telegramBot.launch()
-    .then(() => console.log('🤖 Telegram Bot شغال!'))
-    .catch(err => console.error('❌ فشل تشغيل Telegram Bot:', err));
+    .then(() => {
+        console.log('🤖 Telegram Bot شغال!');
+        logBotStatus('started', 'Telegram bot launched successfully');
+    })
+    .catch(err => {
+        console.error('❌ فشل تشغيل Telegram Bot:', err);
+        logError('فشل تشغيل Telegram Bot', err);
+    });
 
 connectToWhatsApp()
-    .catch(err => console.error('❌ فشل الاتصال الأولي بـ WhatsApp:', err));
+    .then(() => {
+        logBotStatus('started', 'WhatsApp connection established');
+    })
+    .catch(err => {
+        console.error('❌ فشل الاتصال الأولي بـ WhatsApp:', err);
+        logError('فشل الاتصال الأولي بـ WhatsApp', err);
+    });
+
+// فحص الجداول الزمنية كل دقيقة
+setInterval(async () => {
+    try {
+        const dueSchedules = checkDueSchedules();
+        for (const schedule of dueSchedules) {
+            console.log(`⏰ تنفيذ جدول زمني: ${schedule.name}`);
+            
+            switch (schedule.action) {
+                case 'stop':
+                    setBotStatus(false);
+                    logBotStatus('stopped', 'Scheduled stop');
+                    break;
+                case 'start':
+                    setBotStatus(true);
+                    logBotStatus('started', 'Scheduled start');
+                    break;
+                case 'report':
+                    // إرسال تقرير يومي
+                    const report = generateDailyReport();
+                    if (TELEGRAM_CHANNEL_ID) {
+                        await telegramBot.telegram.sendMessage(TELEGRAM_CHANNEL_ID, report, { parse_mode: 'Markdown' });
+                    }
+                    break;
+            }
+        }
+    } catch (error) {
+        logError('خطأ في فحص الجداول الزمنية', error);
+    }
+}, 60000); // كل دقيقة
 
 process.on('SIGINT', () => {
     console.log('\n⏹️ إيقاف البوت...');

@@ -21,6 +21,30 @@ import {
     getTelegramChannel
 } from '../utils/config.js';
 
+import {
+    addSmartAlert,
+    removeSmartAlert,
+    setSmartAlertsStatus,
+    getSmartAlerts,
+    addSchedule,
+    removeSchedule,
+    getSchedules,
+    addAdmin,
+    removeAdmin,
+    getAdmins,
+    checkAdminPermission
+} from './alerts.js';
+
+import {
+    generateDailyReport,
+    generateWeeklyReport,
+    generateErrorReport,
+    generateFailedTransfersReport,
+    generateUserActivityReport
+} from './reports.js';
+
+import { readLastLines, cleanOldLogs, logCommand } from '../utils/logger.js';
+
 const COMMAND_PREFIX = '.';
 
 /**
@@ -131,6 +155,83 @@ export async function handleCommand(msg, sock, telegramBot) {
             case 'help':
                 return await handleHelpCommand();
             
+            // أوامر التنبيهات الذكية
+            case 'اضافة_تنبيه':
+            case 'add_alert':
+                return await handleAddAlertCommand(args);
+            
+            case 'حذف_تنبيه':
+            case 'remove_alert':
+                return await handleRemoveAlertCommand(args);
+            
+            case 'التنبيهات':
+            case 'alerts':
+                return await handleListAlertsCommand();
+            
+            case 'تفعيل_تنبيهات':
+            case 'enable_alerts':
+                return await handleEnableAlertsCommand();
+            
+            case 'تعطيل_تنبيهات':
+            case 'disable_alerts':
+                return await handleDisableAlertsCommand();
+            
+            // أوامر الجدولة
+            case 'اضافة_جدول':
+            case 'add_schedule':
+                return await handleAddScheduleCommand(args);
+            
+            case 'حذف_جدول':
+            case 'remove_schedule':
+                return await handleRemoveScheduleCommand(args);
+            
+            case 'الجداول':
+            case 'schedules':
+                return await handleListSchedulesCommand();
+            
+            // أوامر التقارير
+            case 'تقرير_يومي':
+            case 'daily_report':
+                return await handleDailyReportCommand();
+            
+            case 'تقرير_اسبوعي':
+            case 'weekly_report':
+                return await handleWeeklyReportCommand();
+            
+            case 'تقرير_اخطاء':
+            case 'error_report':
+                return await handleErrorReportCommand();
+            
+            case 'تقرير_فاشل':
+            case 'failed_report':
+                return await handleFailedReportCommand();
+            
+            case 'تقرير_نشاط':
+            case 'activity_report':
+                return await handleActivityReportCommand();
+            
+            // أوامر اللوجات
+            case 'لوج':
+            case 'logs':
+                return await handleLogsCommand(args);
+            
+            case 'نظافة_لوجات':
+            case 'clean_logs':
+                return await handleCleanLogsCommand();
+            
+            // أوامر المشرفين
+            case 'اضافة_مشرف':
+            case 'add_admin':
+                return await handleAddAdminCommand(args);
+            
+            case 'حذف_مشرف':
+            case 'remove_admin':
+                return await handleRemoveAdminCommand(args);
+            
+            case 'المشرفين':
+            case 'admins':
+                return await handleListAdminsCommand();
+            
             default:
                 return {
                     handled: true,
@@ -139,6 +240,7 @@ export async function handleCommand(msg, sock, telegramBot) {
         }
     } catch (error) {
         console.error('❌ خطأ في معالجة الأمر:', error);
+        logCommand(senderPhone, command, args, false);
         return {
             handled: true,
             response: `❌ حدث خطأ أثناء تنفيذ الأمر: ${error.message}`
@@ -514,6 +616,335 @@ async function handleHelpCommand() {
                   `• .الغاء_حظر <رقم>\n` +
                   `• .تفعيل_فلتر\n` +
                   `• .تعطيل_فلتر\n\n` +
+                  `🔔 التنبيهات:\n` +
+                  `• .اضافة_تنبيه <كلمة>\n` +
+                  `• .حذف_تنبيه <كلمة>\n` +
+                  `• .التنبيهات\n` +
+                  `• .تفعيل_تنبيهات\n\n` +
+                  `⏰ الجدولة:\n` +
+                  `• .اضافة_جدول\n` +
+                  `• .حذف_جدول\n` +
+                  `• .الجداول\n\n` +
+                  `📊 التقارير:\n` +
+                  `• .تقرير_يومي\n` +
+                  `• .تقرير_اسبوعي\n` +
+                  `• .تقرير_اخطاء\n` +
+                  `• .تقرير_فاشل\n` +
+                  `• .تقرير_نشاط\n\n` +
+                  `📝 اللوجات:\n` +
+                  `• .لوج <نوع>\n` +
+                  `• .نظافة_لوجات\n\n` +
+                  `👔 المشرفين:\n` +
+                  `• .اضافة_مشرف <رقم>\n` +
+                  `• .حذف_مشرف <رقم>\n` +
+                  `• .المشرفين\n\n` +
                   `• .المساعدة - هذه الرسالة`
+    };
+}
+
+// ==================== أوامر التنبيهات الذكية ====================
+
+async function handleAddAlertCommand(args) {
+    if (args.length < 1) {
+        return {
+            handled: true,
+            response: '❌ الاستخدام الصحيح:\n.اضافة_تنبيه <كلمة_التنبيه>\n\nمثال:\n.اضافة_تنبيه عاجل'
+        };
+    }
+    
+    const keyword = args.join(' ');
+    const success = addSmartAlert(keyword);
+    
+    if (success) {
+        return {
+            handled: true,
+            response: `✅ تم إضافة التنبيه الذكي بنجاح!\n\n🔔 الكلمة: "${keyword}"\n\nسيتم تنبيهك عند ذكر هذه الكلمة في الرسائل`
+        };
+    } else {
+        return {
+            handled: true,
+            response: '❌ التنبيه موجود بالفعل'
+        };
+    }
+}
+
+async function handleRemoveAlertCommand(args) {
+    if (args.length < 1) {
+        return {
+            handled: true,
+            response: '❌ الاستخدام الصحيح:\n.حذف_تنبيه <كلمة_التنبيه>\n\nمثال:\n.حذف_تنبيه عاجل'
+        };
+    }
+    
+    const keyword = args.join(' ');
+    const success = removeSmartAlert(keyword);
+    
+    if (success) {
+        return {
+            handled: true,
+            response: `✅ تم حذف التنبيه بنجاح!\n\n🔔 الكلمة: "${keyword}"`
+        };
+    } else {
+        return {
+            handled: true,
+            response: '❌ التنبيه غير موجود'
+        };
+    }
+}
+
+async function handleListAlertsCommand() {
+    const alerts = getSmartAlerts();
+    
+    if (!alerts.keywords || alerts.keywords.length === 0) {
+        return {
+            handled: true,
+            response: '📋 لا توجد تنبيهات ذكية حالياً\n\nاستخدم .اضافة_تنبيه لإضافة تنبيه'
+        };
+    }
+    
+    let response = '📋 التنبيهات الذكية:\n\n';
+    const status = alerts.enabled ? '🟢 مفعلة' : '🔴 معطلة';
+    response += `الحالة: ${status}\n\n`;
+    
+    alerts.keywords.forEach((alert, index) => {
+        response += `${index + 1}. 🔔 "${alert.keyword}"\n`;
+    });
+    
+    return {
+        handled: true,
+        response
+    };
+}
+
+async function handleEnableAlertsCommand() {
+    setSmartAlertsStatus(true);
+    return {
+        handled: true,
+        response: '✅ تم تفعيل التنبيهات الذكية\n\nسيتم إرسال تنبيهات عند ذكر الكلمات المحددة'
+    };
+}
+
+async function handleDisableAlertsCommand() {
+    setSmartAlertsStatus(false);
+    return {
+        handled: true,
+        response: '🔓 تم تعطيل التنبيهات الذكية\n\nلن يتم إرسال تنبيهات'
+    };
+}
+
+// ==================== أوامر الجدولة ====================
+
+async function handleAddScheduleCommand(args) {
+    if (args.length < 3) {
+        return {
+            handled: true,
+            response: '❌ الاستخدام الصحيح:\n.اضافة_جدول <اسم> <وقت HH:MM> <إجراء>\n\nمثال:\n.اضافة_جدول تقرير_صباحي 08:00 report'
+        };
+    }
+    
+    const name = args[0];
+    const time = args[1];
+    const action = args[2];
+    
+    const success = addSchedule(name, 'daily', time, action);
+    
+    if (success) {
+        return {
+            handled: true,
+            response: `✅ تم إضافة الجدول الزمني بنجاح!\n\n📅 الاسم: ${name}\n⏰ الوقت: ${time}\n⚡ الإجراء: ${action}`
+        };
+    } else {
+        return {
+            handled: true,
+            response: '❌ فشل إضافة الجدول'
+        };
+    }
+}
+
+async function handleRemoveScheduleCommand(args) {
+    if (args.length < 1) {
+        return {
+            handled: true,
+            response: '❌ الاستخدام الصحيح:\n.حذف_جدول <اسم>\n\nمثال:\n.حذف_جدول تقرير_صباحي'
+        };
+    }
+    
+    const name = args[0];
+    const success = removeSchedule(name);
+    
+    if (success) {
+        return {
+            handled: true,
+            response: `✅ تم حذف الجدول الزمني: ${name}`
+        };
+    } else {
+        return {
+            handled: true,
+            response: '❌ الجدول غير موجود'
+        };
+    }
+}
+
+async function handleListSchedulesCommand() {
+    const schedules = getSchedules();
+    
+    if (schedules.length === 0) {
+        return {
+            handled: true,
+            response: '📋 لا توجد جداول زمنية\n\nاستخدم .اضافة_جدول لإضافة جدول'
+        };
+    }
+    
+    let response = '📋 الجداول الزمنية:\n\n';
+    schedules.forEach((schedule, index) => {
+        const status = schedule.enabled ? '🟢' : '🔴';
+        response += `${index + 1}. ${status} ${schedule.name}\n`;
+        response += `   ⏰ ${schedule.time} | ${schedule.action}\n\n`;
+    });
+    
+    return {
+        handled: true,
+        response
+    };
+}
+
+// ==================== أوامر التقارير ====================
+
+async function handleDailyReportCommand() {
+    const report = generateDailyReport();
+    return {
+        handled: true,
+        response: report
+    };
+}
+
+async function handleWeeklyReportCommand() {
+    const report = generateWeeklyReport();
+    return {
+        handled: true,
+        response: report
+    };
+}
+
+async function handleErrorReportCommand() {
+    const report = generateErrorReport(15);
+    return {
+        handled: true,
+        response: report
+    };
+}
+
+async function handleFailedReportCommand() {
+    const report = generateFailedTransfersReport(15);
+    return {
+        handled: true,
+        response: report
+    };
+}
+
+async function handleActivityReportCommand() {
+    const report = generateUserActivityReport();
+    return {
+        handled: true,
+        response: report
+    };
+}
+
+// ==================== أوامر اللوجات ====================
+
+async function handleLogsCommand(args) {
+    if (args.length < 1) {
+        return {
+            handled: true,
+            response: '❌ الاستخدام الصحيح:\n.لوج <نوع>\n\nالأنواع المتاحة:\n• errors\n• whatsapp-messages\n• telegram-messages\n• failed-transfers\n• commands'
+        };
+    }
+    
+    const logType = args[0];
+    const lines = readLastLines(logType, 20);
+    
+    return {
+        handled: true,
+        response: `📝 آخر 20 سطر من ${logType}:\n\n${lines}`
+    };
+}
+
+async function handleCleanLogsCommand() {
+    const deletedCount = cleanOldLogs(30);
+    return {
+        handled: true,
+        response: `🧹 تم حذف ${deletedCount} ملف لوج قديم\n\n(أقدم من 30 يوم)`
+    };
+}
+
+// ==================== أوامر المشرفين ====================
+
+async function handleAddAdminCommand(args) {
+    if (args.length < 1) {
+        return {
+            handled: true,
+            response: '❌ الاستخدام الصحيح:\n.اضافة_مشرف <رقم>\n\nمثال:\n.اضافة_مشرف 201234567890'
+        };
+    }
+    
+    const phoneNumber = args[0].replace(/\D/g, '');
+    const success = addAdmin(phoneNumber);
+    
+    if (success) {
+        return {
+            handled: true,
+            response: `✅ تم إضافة المشرف بنجاح!\n\n👔 الرقم: ${phoneNumber}`
+        };
+    } else {
+        return {
+            handled: true,
+            response: '❌ المشرف موجود بالفعل'
+        };
+    }
+}
+
+async function handleRemoveAdminCommand(args) {
+    if (args.length < 1) {
+        return {
+            handled: true,
+            response: '❌ الاستخدام الصحيح:\n.حذف_مشرف <رقم>\n\nمثال:\n.حذف_مشرف 201234567890'
+        };
+    }
+    
+    const phoneNumber = args[0].replace(/\D/g, '');
+    const success = removeAdmin(phoneNumber);
+    
+    if (success) {
+        return {
+            handled: true,
+            response: `✅ تم حذف المشرف بنجاح!\n\n👔 الرقم: ${phoneNumber}`
+        };
+    } else {
+        return {
+            handled: true,
+            response: '❌ المشرف غير موجود'
+        };
+    }
+}
+
+async function handleListAdminsCommand() {
+    const admins = getAdmins();
+    
+    if (admins.length === 0) {
+        return {
+            handled: true,
+            response: '📋 لا يوجد مشرفين حالياً\n\nاستخدم .اضافة_مشرف لإضافة مشرف'
+        };
+    }
+    
+    let response = '📋 المشرفين:\n\n';
+    admins.forEach((admin, index) => {
+        response += `${index + 1}. 👔 ${admin.phone}\n`;
+        response += `   الصلاحيات: ${admin.permissions.join(', ')}\n\n`;
+    });
+    
+    return {
+        handled: true,
+        response
     };
 }
