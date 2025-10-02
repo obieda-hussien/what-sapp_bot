@@ -93,7 +93,17 @@ async function handleNewMessage(msg) {
     console.log(`\n📨 رسالة جديدة من ${senderName} (ID: ${messageId})`);
 
     try {
-        const messageType = Object.keys(msg.message)[0];
+        // استخراج نوع الرسالة مع تجاهل الرسائل البروتوكولية
+        const messageKeys = Object.keys(msg.message);
+        const protocolMessages = ['senderKeyDistributionMessage', 'messageContextInfo'];
+        const actualMessageKey = messageKeys.find(key => !protocolMessages.includes(key));
+        
+        if (!actualMessageKey) {
+            console.log('⚠️ رسالة بروتوكولية فقط - تم التجاهل');
+            return;
+        }
+        
+        const messageType = actualMessageKey;
         const messageContent = msg.message[messageType];
 
         // استخراج معلومات إضافية
