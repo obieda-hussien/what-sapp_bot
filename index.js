@@ -320,6 +320,8 @@ async function handleNewMessage(msg) {
                 break;
 
             case 'pollCreationMessage':
+            case 'pollCreationMessageV2':
+            case 'pollCreationMessageV3':
                 const poll = messageContent;
                 const pollQuestion = buildCaption(senderName, poll.name, '📊');
                 const pollOptions = poll.options.map(opt => opt.optionName);
@@ -358,11 +360,13 @@ async function handleNewMessage(msg) {
                     location.name ? `📍 *الموقع:* ${location.name}` : '📍 *موقع جغرافي*'
                 );
                 
-                await telegramBot.telegram.sendLocation(
+                const locationSent = await telegramBot.telegram.sendLocation(
                     targetChannel, 
                     location.degreesLatitude, 
                     location.degreesLongitude
                 );
+                
+                messageCache.set(messageId, locationSent.message_id);
                 
                 if (locationText) {
                     await telegramBot.telegram.sendMessage(
@@ -381,11 +385,13 @@ async function handleNewMessage(msg) {
                     `📍 *موقع مباشر (Live Location)*\n⏱️ المدة: ${liveLocation.seconds || 'غير محددة'} ثانية`
                 );
                 
-                await telegramBot.telegram.sendLocation(
+                const liveLocationSent = await telegramBot.telegram.sendLocation(
                     targetChannel, 
                     liveLocation.degreesLatitude, 
                     liveLocation.degreesLongitude
                 );
+                
+                messageCache.set(messageId, liveLocationSent.message_id);
                 
                 await telegramBot.telegram.sendMessage(
                     targetChannel, 
@@ -451,9 +457,19 @@ async function handleMessageUpdate(updates) {
 
     try {
         const updatesArray = Array.isArray(updates) ? updates : [updates];
+        const config = loadConfig();
 
         for (const update of updatesArray) {
-            if (!update.key || update.key.remoteJid !== WHATSAPP_GROUP_JID) continue;
+            if (!update.key) continue;
+            
+            const groupJid = update.key.remoteJid;
+            
+            // التحقق من أن الجروب مراقب
+            const isFromMonitoredGroup = WHATSAPP_GROUP_JID ? 
+                groupJid === WHATSAPP_GROUP_JID : 
+                config.bridges.some(b => b.whatsapp === groupJid);
+            
+            if (!isFromMonitoredGroup) continue;
 
             const messageId = update.key.id;
             
@@ -461,6 +477,14 @@ async function handleMessageUpdate(updates) {
                 const telegramMsgId = messageCache.get(messageId);
                 
                 if (telegramMsgId) {
+                    // تحديد القناة المستهدفة
+                    let targetChannel = TELEGRAM_CHANNEL_ID;
+                    if (!targetChannel) {
+                        targetChannel = getTelegramChannel(groupJid);
+                    }
+                    
+                    if (!targetChannel) continue;
+                    
                     try {
                         await telegramBot.telegram.deleteMessage(targetChannel, telegramMsgId);
                         console.log('✏️ تم حذف النسخة القديمة من Telegram');
@@ -481,6 +505,7 @@ async function handleMessageUpdate(updates) {
         }
     } catch (error) {
         console.error('❌ خطأ في معالجة تحديث الرسالة:', error.message);
+        logError('خطأ في معالجة تحديث رسالة', error);
     }
 }
 
