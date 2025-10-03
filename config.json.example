@@ -1,0 +1,63 @@
+{
+  "bridges": [
+    {
+      "whatsapp": "120363123456789012@g.us",
+      "telegram": "@your_channel",
+      "enabled": true
+    }
+  ],
+  "eliteUsers": [
+    "201234567890"
+  ],
+  "filters": {
+    "enabled": false,
+    "blacklist": [],
+    "whitelist": [],
+    "keywords": [],
+    "allowedTypes": []
+  },
+  "botStatus": {
+    "active": true,
+    "pausedGroups": []
+  },
+  "smartAlerts": {
+    "enabled": false,
+    "keywords": []
+  },
+  "schedules": [],
+  "admins": [],
+  "privateChatResponses": {
+    "enabled": true,
+    "intelligentMatching": true,
+    "keywords": [
+      {
+        "keywords": ["ملخص محاسبة", "ملخص المحاسبة"],
+        "responseType": "document",
+        "text": null,
+        "filePath": "/path/to/accounting_summary.pdf",
+        "caption": "📚 ملخص مادة المحاسبة"
+      },
+      {
+        "keywords": ["المحاضرة الاولي محاسبة", "محاضرة 1 محاسبة"],
+        "responseType": "document",
+        "text": null,
+        "filePath": "/path/to/lecture1_accounting.pdf",
+        "caption": "📖 المحاضرة الأولى - محاسبة"
+      },
+      {
+        "keywords": ["اسايمنت المحاضرة الاولي", "assignment محاضرة 1"],
+        "responseType": "both",
+        "text": "✍️ Assignment المحاضرة الأولى:\n\nالسؤال الأول: ...\nالسؤال الثاني: ...",
+        "filePath": "/path/to/assignment1_image.jpg",
+        "caption": "📝 صورة الـ Assignment"
+      },
+      {
+        "keywords": ["مواعيد المحاضرات", "جدول المحاضرات"],
+        "responseType": "text",
+        "text": "📅 جدول المحاضرات:\n\nالأحد: 10 صباحاً - محاسبة\nالاثنين: 2 مساءً - إحصاء\nالأربعاء: 10 صباحاً - اقتصاد",
+        "filePath": null,
+        "caption": null
+      }
+    ]
+  }
+}
