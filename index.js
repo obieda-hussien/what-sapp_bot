@@ -600,6 +600,10 @@ async function handleMessageUpdate(updates) {
                         console.log('⚠️ لم يتم العثور على الرسالة القديمة للحذف');
                     }
                     
+                    // حذف الإدخال من الكاش قبل إرسال النسخة الجديدة
+                    // هذا مهم لتجنب مشاكل عند التعديلات المتكررة
+                    messageCache.del(messageId);
+                    
                     // إنشاء رسالة محدثة مع الحفاظ على جميع المعلومات الضرورية
                     const updatedMsg = {
                         key: {
@@ -698,36 +702,91 @@ async function connectToWhatsApp() {
             try {
                 const me = sock.user;
                 if (me && me.id) {
-                    const myPhone = me.id.split(':')[0].replace(/\D/g, '');
-                    const myLid = me.lid || null;
+                    // استخراج رقم الهاتف بعدة طرق للتأكد
+                    let myPhone = null;
+                    let myLid = null;
+                    
+                    // الطريقة 1: من me.id (الأساسية)
+                    if (me.id) {
+                        const phoneMatch = me.id.split(':')[0];
+                        if (phoneMatch) {
+                            myPhone = phoneMatch.replace(/\D/g, '');
+                        }
+                    }
+                    
+                    // الطريقة 2: من me.lid إذا كان متوفراً
+                    if (me.lid) {
+                        myLid = me.lid;
+                    }
+                    
+                    // الطريقة 3: من sock.authState.creds (احتياطية)
+                    if (!myPhone && sock.authState?.creds?.me?.id) {
+                        const altPhone = sock.authState.creds.me.id.split(':')[0];
+                        if (altPhone) {
+                            myPhone = altPhone.replace(/\D/g, '');
+                        }
+                    }
+                    
+                    // الطريقة 4: من sock.authState.creds.me.lid (احتياطية)
+                    if (!myLid && sock.authState?.creds?.me?.lid) {
+                        myLid = sock.authState.creds.me.lid;
+                    }
+                    
+                    console.log(`📱 معلومات البوت المستخرجة:`);
+                    console.log(`   رقم الهاتف: ${myPhone || 'غير متوفر'}`);
+                    console.log(`   LID: ${myLid || 'غير متوفر'}`);
                     
                     const config = loadConfig();
                     let updated = false;
+                    const addedNumbers = [];
                     
-                    // إضافة رقم الهاتف إلى النخبة
-                    if (myPhone && !config.eliteUsers.includes(myPhone)) {
-                        config.eliteUsers.push(myPhone);
-                        updated = true;
-                        console.log(`✅ تم إضافة رقمك (${myPhone}) تلقائياً إلى قائمة النخبة`);
+                    // إضافة رقم الهاتف إلى النخبة (إجباري)
+                    if (myPhone) {
+                        if (!config.eliteUsers.includes(myPhone)) {
+                            config.eliteUsers.push(myPhone);
+                            updated = true;
+                            addedNumbers.push(`رقم الهاتف: ${myPhone}`);
+                            console.log(`✅ تم إضافة رقمك (${myPhone}) تلقائياً إلى قائمة النخبة`);
+                        } else {
+                            console.log(`ℹ️  رقمك (${myPhone}) موجود بالفعل في قائمة النخبة`);
+                        }
+                    } else {
+                        console.log('⚠️ تحذير: لم نتمكن من استخراج رقم الهاتف!');
                     }
                     
-                    // إضافة LID إلى النخبة إذا كان متوفراً
-                    if (myLid && !config.eliteUsers.includes(myLid)) {
-                        config.eliteUsers.push(myLid);
-                        updated = true;
-                        console.log(`✅ تم إضافة LID (${myLid}) تلقائياً إلى قائمة النخبة`);
+                    // إضافة LID إلى النخبة (إجباري إذا كان متوفراً)
+                    if (myLid) {
+                        if (!config.eliteUsers.includes(myLid)) {
+                            config.eliteUsers.push(myLid);
+                            updated = true;
+                            addedNumbers.push(`LID: ${myLid}`);
+                            console.log(`✅ تم إضافة LID (${myLid}) تلقائياً إلى قائمة النخبة`);
+                        } else {
+                            console.log(`ℹ️  LID (${myLid}) موجود بالفعل في قائمة النخبة`);
+                        }
+                    } else {
+                        console.log('ℹ️  LID غير متوفر (هذا طبيعي في بعض الحسابات)');
                     }
                     
                     // حفظ التحديثات في config.json
                     if (updated) {
-                        saveConfig(config);
-                        console.log('💾 تم حفظ بياناتك في config.json');
+                        const saved = saveConfig(config);
+                        if (saved) {
+                            console.log('💾 تم حفظ بياناتك في config.json');
+                            console.log(`   تم إضافة: ${addedNumbers.join(', ')}`);
+                        } else {
+                            console.log('❌ فشل حفظ البيانات في config.json');
+                        }
                     }
                     
                     // حفظ الرقم في ملف .env
                     if (myPhone) {
-                        savePhoneToEnv(myPhone, myLid);
-                        console.log('💾 تم حفظ رقمك في ملف .env');
+                        const envSaved = savePhoneToEnv(myPhone, myLid);
+                        if (envSaved) {
+                            console.log('💾 تم حفظ رقمك في ملف .env');
+                        } else {
+                            console.log('⚠️ لم نتمكن من حفظ الرقم في .env');
+                        }
                     }
                     
                     console.log('\n🎉 يمكنك الآن استخدام جميع الأوامر من أي محادثة في الواتس!');
