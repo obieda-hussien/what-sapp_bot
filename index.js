@@ -608,6 +608,35 @@ async function handleMessageUpdate(updates) {
                     
                     if (!targetChannel) continue;
                     
+                    // استخراج النص المعدل
+                    const editedText = update.update.message.conversation || 
+                                      update.update.message.extendedTextMessage?.text || 
+                                      null;
+                    
+                    // محاولة 1: تعديل الرسالة مباشرة في Telegram (الأولوية)
+                    if (editedText) {
+                        try {
+                            const senderName = update.pushName || 'غير معروف';
+                            const finalEditedMessage = FORWARD_SENDER_NAME ? 
+                                buildCaption(senderName, editedText) : 
+                                editedText;
+                            
+                            await telegramBot.telegram.editMessageText(
+                                targetChannel,
+                                telegramMsgId,
+                                undefined,
+                                finalEditedMessage,
+                                { parse_mode: 'Markdown' }
+                            );
+                            console.log('✏️ تم تعديل الرسالة في Telegram');
+                            continue; // نجح التعديل، ننتقل للتحديث التالي
+                        } catch (editError) {
+                            console.log('⚠️ فشل تعديل الرسالة مباشرة، سيتم حذفها وإعادة إرسالها');
+                            // نكمل للطريقة الاحتياطية (حذف وإعادة إرسال)
+                        }
+                    }
+                    
+                    // محاولة 2 (احتياطية): حذف وإعادة إرسال
                     try {
                         await telegramBot.telegram.deleteMessage(targetChannel, telegramMsgId);
                         console.log('✏️ تم حذف النسخة القديمة من Telegram');
