@@ -51,6 +51,7 @@ import {
 } from './reports.js';
 
 import { readLastLines, cleanOldLogs, logCommand } from '../utils/logger.js';
+import { clearConversationMemory, getMemoryStats, isGroqEnabled } from '../utils/groqAssistant.js';
 
 const COMMAND_PREFIX = '.';
 
@@ -229,6 +230,19 @@ export async function handleCommand(msg, sock, telegramBot) {
             case 'تعطيل_ردود':
             case 'disable_responses':
                 return await handleDisablePrivateResponsesCommand();
+            
+            // أوامر Groq AI
+            case 'مسح_ذاكرة':
+            case 'clear_memory':
+                return await handleClearMemoryCommand(senderPhone);
+            
+            case 'احصائيات_ai':
+            case 'ai_stats':
+                return await handleAIStatsCommand();
+            
+            case 'حالة_ai':
+            case 'ai_status':
+                return await handleAIStatusCommand();
             
             // أوامر الجدولة
             case 'اضافة_جدول':
@@ -699,6 +713,10 @@ async function handleHelpCommand() {
                   `• *.اضافة_مشرف* <رقم> - إضافة مشرف بصلاحيات محددة.\n` +
                   `• *.حذف_مشرف* <رقم> - إزالة مشرف.\n` +
                   `• *.المشرفين* - عرض قائمة المشرفين وصلاحياتهم.\n\n` +
+                  `*🤖 Groq AI (الذكاء الاصطناعي):*\n` +
+                  `• *.حالة_ai* - عرض حالة وقدرات Groq AI.\n` +
+                  `• *.مسح_ذاكرة* - مسح ذاكرة المحادثة مع البوت.\n` +
+                  `• *.احصائيات_ai* - عرض إحصائيات استخدام AI.\n\n` +
                   `*❓ المساعدة:*\n` +
                   `• *.المساعدة* - لعرض هذه الرسالة.`
     };
@@ -958,6 +976,78 @@ async function handleDisablePrivateResponsesCommand() {
     return {
         handled: true,
         response: '🔓 تم تعطيل الردود الآلية للمحادثات الخاصة\n\nلن يتم الرد على الرسائل الخاصة'
+    };
+}
+
+/**
+ * أوامر Groq AI
+ */
+async function handleClearMemoryCommand(userId) {
+    const success = clearConversationMemory(userId);
+    
+    if (success) {
+        return {
+            handled: true,
+            response: '🧹 تم مسح ذاكرة المحادثة بنجاح!\n\nالبوت الآن سينسى المحادثات السابقة ويبدأ من جديد.'
+        };
+    } else {
+        return {
+            handled: true,
+            response: 'ℹ️ لا توجد ذاكرة محادثة لمسحها'
+        };
+    }
+}
+
+async function handleAIStatsCommand() {
+    const stats = getMemoryStats();
+    
+    let message = '📊 إحصائيات Groq AI\n\n';
+    message += `💬 عدد المحادثات النشطة: ${stats.totalConversations}\n\n`;
+    
+    if (stats.totalConversations > 0) {
+        message += '📝 تفاصيل المحادثات:\n';
+        stats.conversations.forEach((conv, index) => {
+            message += `${index + 1}. المستخدم: ${conv.userId}\n`;
+            message += `   💭 عدد الرسائل: ${conv.messageCount}\n`;
+        });
+    } else {
+        message += 'ℹ️ لا توجد محادثات نشطة حالياً';
+    }
+    
+    return {
+        handled: true,
+        response: message
+    };
+}
+
+async function handleAIStatusCommand() {
+    const enabled = isGroqEnabled();
+    
+    let message = '🤖 حالة Groq AI\n\n';
+    
+    if (enabled) {
+        message += '✅ **مُفعّل**\n\n';
+        message += '📋 القدرات:\n';
+        message += '• فهم المحادثات الطبيعية\n';
+        message += '• الاحتفاظ بالسياق والذاكرة\n';
+        message += '• إرسال الملفات والمحاضرات\n';
+        message += '• ربط الأحداث ببعضها\n';
+        message += '• تحليل config.json\n\n';
+        message += '💡 الأوامر المتاحة:\n';
+        message += '.مسح_ذاكرة - مسح ذاكرة المحادثة\n';
+        message += '.احصائيات_ai - عرض الإحصائيات\n';
+    } else {
+        message += '⚠️ **غير مُفعّل**\n\n';
+        message += '📝 لتفعيل Groq AI:\n';
+        message += '1. احصل على API Key من: https://console.groq.com\n';
+        message += '2. أضف GROQ_API_KEY في ملف .env\n';
+        message += '3. أعد تشغيل البوت\n\n';
+        message += 'ℹ️ حالياً يعمل البوت بالنظام العادي';
+    }
+    
+    return {
+        handled: true,
+        response: message
     };
 }
 

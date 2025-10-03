@@ -35,6 +35,7 @@ import { checkSmartAlerts } from './plugins/alerts.js';
 import { checkPrivateChatKeyword } from './plugins/privateChat.js';
 import { checkDueSchedules } from './plugins/alerts.js';
 import { generateDailyReport } from './plugins/reports.js';
+import { processWithGroqAI, isGroqEnabled } from './utils/groqAssistant.js';
 
 dotenv.config();
 
@@ -48,6 +49,7 @@ console.log('╚═════════════════════�
 console.log(`📁 مجلد العمل: ${process.cwd()}`);
 console.log(`📝 ملف الإعدادات: ${CONFIG_PATH}`);
 console.log(`📂 ملف .env: ${process.env.TELEGRAM_BOT_TOKEN ? '✅ موجود' : '❌ غير موجود'}`);
+console.log(`🤖 Groq AI: ${process.env.GROQ_API_KEY ? '✅ مُفعّل' : '⚠️  غير مُفعّل (اختياري)'}`);
 console.log(`👥 عدد النخبة: ${initialConfig.eliteUsers.length}`);
 if (initialConfig.eliteUsers.length > 0) {
     console.log(`   📱 النخبة: ${initialConfig.eliteUsers.join(', ')}`);
@@ -233,6 +235,53 @@ async function handleNewMessage(msg) {
         
         const text = messageContent.text || messageContent;
         if (typeof text === 'string') {
+            // محاولة استخدام Groq AI أولاً (إذا كان مُفعّلاً)
+            if (isGroqEnabled()) {
+                console.log('🤖 استخدام Groq AI للرد...');
+                
+                try {
+                    const groqResponse = await processWithGroqAI(text, senderPhone, senderName);
+                    
+                    if (groqResponse.success) {
+                        // إرسال النص
+                        if (groqResponse.text) {
+                            await sock.sendMessage(groupJid, { text: groqResponse.text });
+                            console.log('✅ تم إرسال رد Groq AI');
+                        }
+                        
+                        // إرسال الملف إذا طلب البوت ذلك
+                        if (groqResponse.action === 'send_file' && groqResponse.fileInfo) {
+                            const fileInfo = groqResponse.fileInfo;
+                            const fs = await import('fs');
+                            
+                            if (fileInfo.filePath && fs.existsSync(fileInfo.filePath)) {
+                                const path = await import('path');
+                                await sock.sendMessage(groupJid, {
+                                    document: { url: fileInfo.filePath },
+                                    mimetype: 'application/pdf',
+                                    fileName: path.basename(fileInfo.filePath),
+                                    caption: fileInfo.caption || '📚 تفضل الملف المطلوب'
+                                });
+                                console.log('✅ تم إرسال ملف PDF من Groq AI');
+                            } else {
+                                console.log(`❌ الملف غير موجود: ${fileInfo.filePath}`);
+                                await sock.sendMessage(groupJid, {
+                                    text: '❌ عذراً، الملف المطلوب غير متوفر حالياً'
+                                });
+                            }
+                        }
+                        
+                        return; // تم المعالجة بنجاح
+                    } else {
+                        console.log('⚠️ Groq AI فشل، التراجع للنظام العادي');
+                    }
+                } catch (error) {
+                    console.error('❌ خطأ في Groq AI:', error.message);
+                    console.log('⚠️ التراجع للنظام العادي');
+                }
+            }
+            
+            // النظام العادي (في حال عدم تفعيل Groq أو فشله)
             const response = checkPrivateChatKeyword(text);
             
             if (response) {
