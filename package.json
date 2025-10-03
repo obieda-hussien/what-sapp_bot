@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "start": "node index.js",
-    "dev": "nodemon index.js"
+    "dev": "nodemon index.js",
+    "test:private-chat": "node test_files/test_privateChat.js"
   },
   "keywords": [
     "whatsapp",

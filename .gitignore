@@ -32,3 +32,13 @@ Thumbs.db
 *.tmp
 .tmp/
 temp/
+
+# Test files (users should add their own files)
+test_files/*.pdf
+test_files/*.jpg
+test_files/*.jpeg
+test_files/*.png
+test_files/**/*.pdf
+test_files/**/*.jpg
+test_files/**/*.jpeg
+test_files/**/*.png
