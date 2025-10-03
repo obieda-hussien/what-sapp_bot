@@ -182,6 +182,12 @@ async function handleNewMessage(msg) {
     }
     
     const groupJid = msg.key.remoteJid;
+    
+    // تجاهل رسائل القنوات والنشرات (newsletters) لتجنب الحلقات
+    if (groupJid && groupJid.includes('@newsletter')) {
+        return;
+    }
+    
     const senderName = msg.pushName || 'غير معروف';
     const messageId = msg.key.id;
     const senderPhone = msg.key.participant?.split('@')[0] || msg.key.remoteJid?.split('@')[0];
