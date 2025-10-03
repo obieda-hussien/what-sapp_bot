@@ -819,7 +819,16 @@ async function handleAddPrivateResponseCommand(args) {
     
     // تقسيم الكلمات المفتاحية والمحتوى
     const parts = restArgs.split('|').map(p => p.trim());
-    if (parts.length < 2) {
+    
+    const type = validTypes[responseType];
+    
+    // التحقق من عدد الأجزاء حسب النوع
+    if (type === 'both' && parts.length < 3) {
+        return {
+            handled: true,
+            response: '❌ للنوع "كامل"، يجب فصل الكلمات المفتاحية عن النص عن مسار الملف بـ |\n\nمثال:\n.اضافة_رد كامل كلمة | النص | /path/to/file.pdf'
+        };
+    } else if (type !== 'both' && parts.length < 2) {
         return {
             handled: true,
             response: '❌ يجب فصل الكلمات المفتاحية عن المحتوى بـ |'
@@ -827,30 +836,19 @@ async function handleAddPrivateResponseCommand(args) {
     }
     
     const keywords = parts[0].split(',').map(k => k.trim());
-    const content = parts[1];
-    
-    const type = validTypes[responseType];
     
     // تحديد المحتوى حسب النوع
     let text = null;
     let filePath = null;
     
     if (type === 'text') {
-        text = content;
+        text = parts[1];
     } else if (type === 'image' || type === 'document') {
-        filePath = content;
+        filePath = parts[1];
     } else if (type === 'both') {
-        // في حالة both، نتوقع نص ثم | ثم مسار الملف
-        const bothParts = content.split('|').map(p => p.trim());
-        if (bothParts.length >= 2) {
-            text = bothParts[0];
-            filePath = bothParts[1];
-        } else {
-            return {
-                handled: true,
-                response: '❌ للنوع "كامل"، يجب فصل النص عن مسار الملف بـ |\n\nمثال:\n.اضافة_رد كامل كلمة | النص | /path/to/file.pdf'
-            };
-        }
+        // في حالة both، نتوقع كلمات مفتاحية | نص | مسار الملف
+        text = parts[1];
+        filePath = parts[2];
     }
     
     const success = addPrivateChatResponse(keywords, type, text, filePath);

@@ -51,10 +51,7 @@ test_files/
 
 ### رد كامل (نص + ملف)
 ```
-.اضافة_رد كامل اسايمنت المحاضرة الاولي,assignment 1 | ✍️ Assignment المحاضرة الأولى:
-
-حل الأسئلة من 1 إلى 5
-آخر موعد للتسليم: الأحد القادم | /home/runner/work/what-sapp_bot/what-sapp_bot/test_files/accounting/assignment1.jpg
+.اضافة_رد كامل اسايمنت المحاضرة الاولي,assignment 1 | ✍️ Assignment المحاضرة الأولى: حل الأسئلة من 1 إلى 5، آخر موعد: الأحد القادم | /home/runner/work/what-sapp_bot/what-sapp_bot/test_files/accounting/assignment1.jpg
 ```
 
 ## الخطوة 4: التحقق من الردود المضافة
