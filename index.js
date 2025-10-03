@@ -176,6 +176,11 @@ function splitLongMessage(text, maxLength = 4096) {
 async function handleNewMessage(msg) {
     if (!msg.message) return;
     
+    // تجاهل الرسائل المرسلة من البوت نفسه لتجنب الحلقات اللانهائية
+    if (msg.key.fromMe) {
+        return;
+    }
+    
     const groupJid = msg.key.remoteJid;
     const senderName = msg.pushName || 'غير معروف';
     const messageId = msg.key.id;
