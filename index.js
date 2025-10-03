@@ -582,6 +582,21 @@ async function handleMessageUpdate(updates) {
             const messageId = update.key.id;
             
             if (update.update?.message) {
+                // التحقق من أن الرسالة تحتوي على محتوى فعلي (ليس فقط بروتوكول)
+                const messageKeys = Object.keys(update.update.message);
+                const protocolMessages = [
+                    'senderKeyDistributionMessage', 
+                    'messageContextInfo',
+                    'associatedChildMessage',
+                    'editedMessage'
+                ];
+                const hasActualContent = messageKeys.some(key => !protocolMessages.includes(key));
+                
+                if (!hasActualContent) {
+                    console.log('⚠️ تحديث الرسالة يحتوي فقط على بيانات بروتوكول - تم تجاهله');
+                    continue;
+                }
+                
                 const telegramMsgId = messageCache.get(messageId);
                 
                 if (telegramMsgId) {
@@ -619,6 +634,8 @@ async function handleMessageUpdate(updates) {
                     // إرسال الرسالة المعدلة
                     await handleNewMessage(updatedMsg);
                     console.log('✅ تم إرسال النسخة المعدلة إلى Telegram');
+                } else {
+                    console.log('ℹ️  رسالة معدلة لكن لا يوجد معرف في الكاش - ربما رسالة قديمة');
                 }
             }
         }
