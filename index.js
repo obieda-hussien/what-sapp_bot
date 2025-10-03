@@ -582,21 +582,6 @@ async function handleMessageUpdate(updates) {
             const messageId = update.key.id;
             
             if (update.update?.message) {
-                // التحقق من أن الرسالة تحتوي على محتوى فعلي (ليس فقط بروتوكول)
-                const messageKeys = Object.keys(update.update.message);
-                const protocolMessages = [
-                    'senderKeyDistributionMessage', 
-                    'messageContextInfo',
-                    'associatedChildMessage',
-                    'editedMessage'
-                ];
-                const hasActualContent = messageKeys.some(key => !protocolMessages.includes(key));
-                
-                if (!hasActualContent) {
-                    console.log('⚠️ تحديث الرسالة يحتوي فقط على بيانات بروتوكول - تم تجاهله');
-                    continue;
-                }
-                
                 const telegramMsgId = messageCache.get(messageId);
                 
                 if (telegramMsgId) {
@@ -608,10 +593,19 @@ async function handleMessageUpdate(updates) {
                     
                     if (!targetChannel) continue;
                     
-                    // استخراج النص المعدل
-                    const editedText = update.update.message.conversation || 
-                                      update.update.message.extendedTextMessage?.text || 
-                                      null;
+                    // استخراج النص المعدل - البحث في editedMessage.message إذا كان موجوداً
+                    let editedText = null;
+                    let messageToUse = update.update.message;
+                    
+                    // إذا كان التحديث يحتوي على editedMessage، نستخدم محتواه
+                    if (update.update.message.editedMessage?.message) {
+                        messageToUse = update.update.message.editedMessage.message;
+                    }
+                    
+                    // استخراج النص من المكان الصحيح
+                    editedText = messageToUse.conversation || 
+                                messageToUse.extendedTextMessage?.text || 
+                                null;
                     
                     // محاولة 1: تعديل الرسالة مباشرة في Telegram (الأولوية)
                     if (editedText) {
@@ -655,7 +649,7 @@ async function handleMessageUpdate(updates) {
                             remoteJid: groupJid, // تأكد من وجود remoteJid
                             id: messageId
                         },
-                        message: update.update.message,
+                        message: messageToUse, // استخدام الرسالة الصحيحة (من editedMessage.message إذا كان موجوداً)
                         pushName: update.pushName || 'غير معروف',
                         messageTimestamp: update.messageTimestamp || Date.now()
                     };
