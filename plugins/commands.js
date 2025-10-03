@@ -36,6 +36,13 @@ import {
 } from './alerts.js';
 
 import {
+    addPrivateChatResponse,
+    removePrivateChatResponse,
+    listPrivateChatResponses,
+    setPrivateChatStatus
+} from './privateChat.js';
+
+import {
     generateDailyReport,
     generateWeeklyReport,
     generateErrorReport,
@@ -184,6 +191,27 @@ export async function handleCommand(msg, sock, telegramBot) {
             case 'تعطيل_تنبيهات':
             case 'disable_alerts':
                 return await handleDisableAlertsCommand();
+            
+            // أوامر الردود الآلية للمحادثات الخاصة
+            case 'اضافة_رد':
+            case 'add_response':
+                return await handleAddPrivateResponseCommand(args);
+            
+            case 'حذف_رد':
+            case 'remove_response':
+                return await handleRemovePrivateResponseCommand(args);
+            
+            case 'الردود':
+            case 'responses':
+                return await handleListPrivateResponsesCommand();
+            
+            case 'تفعيل_ردود':
+            case 'enable_responses':
+                return await handleEnablePrivateResponsesCommand();
+            
+            case 'تعطيل_ردود':
+            case 'disable_responses':
+                return await handleDisablePrivateResponsesCommand();
             
             // أوامر الجدولة
             case 'اضافة_جدول':
@@ -631,6 +659,12 @@ async function handleHelpCommand() {
                   `• *.التنبيهات* - عرض جميع كلمات التنبيه الحالية.\n` +
                   `• *.تفعيل_تنبيهات* - تفعيل نظام التنبيهات الذكية.\n` +
                   `• *.تعطيل_تنبيهات* - تعطيل نظام التنبيهات الذكية.\n\n` +
+                  `*💬 الردود الآلية (محادثات خاصة):*\n` +
+                  `• *.اضافة_رد* <نوع> <كلمات> | <محتوى> - إضافة رد آلي للمحادثات الخاصة.\n` +
+                  `• *.حذف_رد* <كلمة> - حذف رد آلي.\n` +
+                  `• *.الردود* - عرض جميع الردود الآلية.\n` +
+                  `• *.تفعيل_ردود* - تفعيل الردود الآلية.\n` +
+                  `• *.تعطيل_ردود* - تعطيل الردود الآلية.\n\n` +
                   `*⏰ المهام المجدولة:*\n` +
                   `• *.اضافة_جدول* - إضافة مهمة مجدولة (مثل تقرير يومي).\n` +
                   `• *.حذف_جدول* - حذف مهمة مجدولة.\n` +
@@ -740,6 +774,168 @@ async function handleDisableAlertsCommand() {
     return {
         handled: true,
         response: '🔓 تم تعطيل التنبيهات الذكية\n\nلن يتم إرسال تنبيهات'
+    };
+}
+
+// ==================== أوامر الردود الآلية للمحادثات الخاصة ====================
+
+async function handleAddPrivateResponseCommand(args) {
+    if (args.length < 3) {
+        return {
+            handled: true,
+            response: '❌ الاستخدام الصحيح:\n' +
+                      '.اضافة_رد <نوع> <كلمات_مفتاحية> | <محتوى>\n\n' +
+                      'أنواع الردود:\n' +
+                      '• نص - رد نصي فقط\n' +
+                      '• صورة - رد بصورة\n' +
+                      '• ملف - رد بملف PDF\n' +
+                      '• كامل - رد بنص وملف\n\n' +
+                      'مثال:\n' +
+                      '.اضافة_رد نص ملخص محاسبة,ملخص المحاسبة | هذا هو ملخص مادة المحاسبة'
+        };
+    }
+    
+    const responseType = args[0];
+    const restArgs = args.slice(1).join(' ');
+    
+    // التحقق من نوع الرد
+    const validTypes = {
+        'نص': 'text',
+        'صورة': 'image',
+        'ملف': 'document',
+        'كامل': 'both',
+        'text': 'text',
+        'image': 'image',
+        'document': 'document',
+        'both': 'both'
+    };
+    
+    if (!validTypes[responseType]) {
+        return {
+            handled: true,
+            response: '❌ نوع غير صحيح. الأنواع المتاحة: نص، صورة، ملف، كامل'
+        };
+    }
+    
+    // تقسيم الكلمات المفتاحية والمحتوى
+    const parts = restArgs.split('|').map(p => p.trim());
+    if (parts.length < 2) {
+        return {
+            handled: true,
+            response: '❌ يجب فصل الكلمات المفتاحية عن المحتوى بـ |'
+        };
+    }
+    
+    const keywords = parts[0].split(',').map(k => k.trim());
+    const content = parts[1];
+    
+    const type = validTypes[responseType];
+    
+    // تحديد المحتوى حسب النوع
+    let text = null;
+    let filePath = null;
+    
+    if (type === 'text') {
+        text = content;
+    } else if (type === 'image' || type === 'document') {
+        filePath = content;
+    } else if (type === 'both') {
+        // في حالة both، نتوقع نص ثم | ثم مسار الملف
+        const bothParts = content.split('|').map(p => p.trim());
+        if (bothParts.length >= 2) {
+            text = bothParts[0];
+            filePath = bothParts[1];
+        } else {
+            return {
+                handled: true,
+                response: '❌ للنوع "كامل"، يجب فصل النص عن مسار الملف بـ |\n\nمثال:\n.اضافة_رد كامل كلمة | النص | /path/to/file.pdf'
+            };
+        }
+    }
+    
+    const success = addPrivateChatResponse(keywords, type, text, filePath);
+    
+    if (success) {
+        return {
+            handled: true,
+            response: `✅ تم إضافة الرد الآلي بنجاح!\n\n🔑 الكلمات المفتاحية: ${keywords.join(', ')}\n📝 النوع: ${responseType}`
+        };
+    } else {
+        return {
+            handled: true,
+            response: '❌ فشل إضافة الرد الآلي'
+        };
+    }
+}
+
+async function handleRemovePrivateResponseCommand(args) {
+    if (args.length < 1) {
+        return {
+            handled: true,
+            response: '❌ الاستخدام الصحيح:\n.حذف_رد <كلمة_مفتاحية>\n\nمثال:\n.حذف_رد ملخص محاسبة'
+        };
+    }
+    
+    const keyword = args.join(' ');
+    const success = removePrivateChatResponse(keyword);
+    
+    if (success) {
+        return {
+            handled: true,
+            response: `✅ تم حذف الرد الآلي الخاص بـ "${keyword}"`
+        };
+    } else {
+        return {
+            handled: true,
+            response: '❌ لم يتم العثور على رد آلي بهذه الكلمة المفتاحية'
+        };
+    }
+}
+
+async function handleListPrivateResponsesCommand() {
+    const responses = listPrivateChatResponses();
+    
+    if (responses.length === 0) {
+        return {
+            handled: true,
+            response: '📋 لا يوجد ردود آلية مضافة حالياً\n\nاستخدم .اضافة_رد لإضافة رد جديد'
+        };
+    }
+    
+    let message = '📋 الردود الآلية للمحادثات الخاصة:\n\n';
+    
+    responses.forEach((resp, index) => {
+        const keywords = Array.isArray(resp.keywords) ? resp.keywords : [resp.keywords];
+        message += `${index + 1}. 🔑 ${keywords.join(', ')}\n`;
+        message += `   📝 النوع: ${resp.responseType}\n`;
+        if (resp.text) {
+            message += `   💬 النص: ${resp.text.substring(0, 50)}${resp.text.length > 50 ? '...' : ''}\n`;
+        }
+        if (resp.filePath) {
+            message += `   📁 الملف: ${resp.filePath}\n`;
+        }
+        message += '\n';
+    });
+    
+    return {
+        handled: true,
+        response: message
+    };
+}
+
+async function handleEnablePrivateResponsesCommand() {
+    setPrivateChatStatus(true);
+    return {
+        handled: true,
+        response: '✅ تم تفعيل الردود الآلية للمحادثات الخاصة\n\nسيتم الرد على الرسائل التي تحتوي على الكلمات المفتاحية'
+    };
+}
+
+async function handleDisablePrivateResponsesCommand() {
+    setPrivateChatStatus(false);
+    return {
+        handled: true,
+        response: '🔓 تم تعطيل الردود الآلية للمحادثات الخاصة\n\nلن يتم الرد على الرسائل الخاصة'
     };
 }
 

@@ -32,6 +32,7 @@ import {
     logBotStatus 
 } from './utils/logger.js';
 import { checkSmartAlerts } from './plugins/alerts.js';
+import { checkPrivateChatKeyword } from './plugins/privateChat.js';
 import { checkDueSchedules } from './plugins/alerts.js';
 import { generateDailyReport } from './plugins/reports.js';
 
@@ -220,6 +221,99 @@ async function handleNewMessage(msg) {
     const isFromMonitoredGroup = WHATSAPP_GROUP_JID ? 
         groupJid === WHATSAPP_GROUP_JID : 
         config.bridges.some(b => b.whatsapp === groupJid);
+    
+    // التحقق من أن الرسالة من محادثة خاصة (private chat)
+    // المحادثات الخاصة تنتهي بـ @s.whatsapp.net
+    // المجموعات تنتهي بـ @g.us
+    const isPrivateChat = groupJid.endsWith('@s.whatsapp.net');
+    
+    // إذا كانت محادثة خاصة، نحاول الرد عليها
+    if (isPrivateChat) {
+        console.log(`\n💬 رسالة خاصة من ${senderName} (${senderPhone})`);
+        
+        const text = messageContent.text || messageContent;
+        if (typeof text === 'string') {
+            const response = checkPrivateChatKeyword(text);
+            
+            if (response) {
+                console.log(`🔍 تم العثور على كلمة مفتاحية: ${response.keyword}`);
+                console.log(`📝 نوع الرد: ${response.responseType}`);
+                
+                try {
+                    // إرسال الرد حسب النوع
+                    if (response.responseType === 'text' && response.text) {
+                        await sock.sendMessage(groupJid, { text: response.text });
+                        console.log('✅ تم إرسال رد نصي');
+                    } else if (response.responseType === 'image' && response.filePath) {
+                        const fs = await import('fs');
+                        if (fs.existsSync(response.filePath)) {
+                            await sock.sendMessage(groupJid, {
+                                image: { url: response.filePath },
+                                caption: response.caption || ''
+                            });
+                            console.log('✅ تم إرسال صورة');
+                        } else {
+                            console.log(`❌ الملف غير موجود: ${response.filePath}`);
+                            await sock.sendMessage(groupJid, { 
+                                text: '❌ عذراً، الملف المطلوب غير متوفر حالياً' 
+                            });
+                        }
+                    } else if (response.responseType === 'document' && response.filePath) {
+                        const fs = await import('fs');
+                        if (fs.existsSync(response.filePath)) {
+                            const path = await import('path');
+                            await sock.sendMessage(groupJid, {
+                                document: { url: response.filePath },
+                                mimetype: 'application/pdf',
+                                fileName: path.basename(response.filePath),
+                                caption: response.caption || ''
+                            });
+                            console.log('✅ تم إرسال ملف PDF');
+                        } else {
+                            console.log(`❌ الملف غير موجود: ${response.filePath}`);
+                            await sock.sendMessage(groupJid, { 
+                                text: '❌ عذراً، الملف المطلوب غير متوفر حالياً' 
+                            });
+                        }
+                    } else if (response.responseType === 'both') {
+                        // إرسال النص أولاً
+                        if (response.text) {
+                            await sock.sendMessage(groupJid, { text: response.text });
+                        }
+                        // ثم إرسال الصورة/الملف
+                        if (response.filePath) {
+                            const fs = await import('fs');
+                            if (fs.existsSync(response.filePath)) {
+                                const ext = response.filePath.toLowerCase();
+                                if (ext.endsWith('.jpg') || ext.endsWith('.jpeg') || ext.endsWith('.png')) {
+                                    await sock.sendMessage(groupJid, {
+                                        image: { url: response.filePath },
+                                        caption: response.caption || ''
+                                    });
+                                } else {
+                                    const path = await import('path');
+                                    await sock.sendMessage(groupJid, {
+                                        document: { url: response.filePath },
+                                        mimetype: 'application/pdf',
+                                        fileName: path.basename(response.filePath),
+                                        caption: response.caption || ''
+                                    });
+                                }
+                                console.log('✅ تم إرسال الرد الكامل (نص + ملف)');
+                            } else {
+                                console.log(`❌ الملف غير موجود: ${response.filePath}`);
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error('❌ خطأ في إرسال الرد:', error.message);
+                }
+            } else {
+                console.log('ℹ️ لم يتم العثور على كلمة مفتاحية - لن يتم الرد');
+            }
+        }
+        return; // لا نقوم بنقل المحادثات الخاصة إلى Telegram
+    }
     
     // إذا لم تكن الرسالة من جروب مراقب، نتجاهلها (ما عدا الأوامر)
     if (!isFromMonitoredGroup) return;

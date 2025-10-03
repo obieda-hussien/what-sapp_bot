@@ -61,6 +61,7 @@ export function loadConfig() {
         if (!mergedConfig.smartAlerts) mergedConfig.smartAlerts = defaultConfig.smartAlerts;
         if (!mergedConfig.schedules) mergedConfig.schedules = defaultConfig.schedules;
         if (!mergedConfig.admins) mergedConfig.admins = defaultConfig.admins;
+        if (!mergedConfig.privateChatResponses) mergedConfig.privateChatResponses = defaultConfig.privateChatResponses;
         
         let needsSave = false;
         
@@ -198,7 +199,11 @@ function getDefaultConfig() {
             keywords: []
         },
         schedules: [],
-        admins: []
+        admins: [],
+        privateChatResponses: {
+            enabled: false,
+            keywords: []
+        }
     };
 }
 
