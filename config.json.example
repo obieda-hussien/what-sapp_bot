@@ -28,6 +28,7 @@
   "admins": [],
   "privateChatResponses": {
     "enabled": true,
+    "intelligentMatching": true,
     "keywords": [
       {
         "keywords": ["ملخص محاسبة", "ملخص المحاسبة"],
