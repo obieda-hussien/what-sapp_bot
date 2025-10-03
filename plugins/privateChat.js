@@ -21,6 +21,11 @@ export function checkPrivateChatKeyword(messageText, useIntelligentMatching = tr
         return null;
     }
     
+    // تجاهل الأوامر التي تبدأ بـ "." - الأوامر تُعالج بشكل منفصل
+    if (messageText.trim().startsWith('.')) {
+        return null;
+    }
+    
     const responses = config.privateChatResponses.keywords || [];
     
     // التحقق من إعدادات المطابقة الذكية
