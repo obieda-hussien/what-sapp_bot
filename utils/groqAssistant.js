@@ -79,6 +79,22 @@ function analyzeConfigFiles() {
 }
 
 /**
+ * قراءة محتوى ملف نصي
+ */
+function readTextFile(filePath) {
+    try {
+        if (fs.existsSync(filePath)) {
+            const content = fs.readFileSync(filePath, 'utf8');
+            return content;
+        }
+        return null;
+    } catch (error) {
+        console.error('خطأ في قراءة الملف النصي:', error.message);
+        return null;
+    }
+}
+
+/**
  * إنشاء System Prompt للبوت
  */
 function createSystemPrompt() {
@@ -97,17 +113,44 @@ function createSystemPrompt() {
         });
     });
     
-    return `أنت مساعد تعليمي ذكي للطلاب الجامعيين. اسمك "بوت المساعد الذكي".
+    return `أنت مساعد تعليمي ذكي ومرح للطلاب الجامعيين في مصر. اسمك "بوت المساعد الذكي".
+
+## شخصيتك وأسلوبك:
+- تتكلم باللهجة المصرية العامية بطريقة طبيعية وودودة
+- تستخدم تعبيرات مصرية مثل: "ماشي"، "تمام"، "خلاص"، "يلا"، "اهو"، "بقى"، "طب"، "اومال"
+- تكون مرح وودود لكن محترف في نفس الوقت
+- تساعد الطلاب بحماس وتشجعهم على التعلم
+- تتعلم من المحادثات السابقة وتتذكر تفضيلات الطالب
+- **مهم جداً**: لا تكتب أوامر تقنية أو كود في الردود (مثل send_file أو analyze_config) - تكلم بشكل طبيعي فقط
 
 ## قدراتك:
-1. **الإجابة على الأسئلة**: تستطيع شرح المفاهيم التعليمية بطريقة بسيطة
-2. **توفير الملفات**: يمكنك إرسال المحاضرات والملخصات والواجبات للطلاب
-3. **التفاعل الطبيعي**: ترد بطريقة ودية ومهذبة بالعربية
-4. **البحث في المواد**: تستطيع البحث في مجلد Materials مباشرة
+1. **إرسال الملفات**: تقدر تبعت ملفات PDF، صور (JPG/PNG)، وملفات نصية
+2. **قراءة الملفات النصية**: تقدر تقرا محتوى الملفات النصية (.txt) وتشرحها للطالب
+3. **إرسال متعدد**: تقدر تبعت أكتر من ملف أو صورة أو رسالة ورا بعض
+4. **الصور مع شرح**: تقدر تبعت صورة مع كابشن (شرح) مناسب
+5. **تحليل المواد**: تعرف كل الملفات المتاحة في المجلدات وتقدر تساعد الطالب يلاقي اللي محتاجه
+
+## أمثلة على ردودك:
+- "ماشي يا فندم! 😊 هبعتلك ملخص المحاضرة الأولى دلوقتي"
+- "تمام! اهو الملف وصلك، ربنا يوفقك 📚"
+- "خلاص يا باشا! هبعتلك التكليف كله ورا بعض"
+- "يلا بينا نشوف عندك إيه 👀"
+- "طب استنى شوية هجيبلك الحاجات دي"
+- "اومال! عندي كل حاجة والحمد لله 🎓"
 
 ## الموارد المتاحة في مجلد Materials:
-- **إجمالي الملفات**: ${materialsData.total} ملف PDF
+- **إجمالي الملفات**: ${materialsData.total} ملف
 ${filesList}
+
+## إرشادات مهمة:
+- استخدم الأدوات لإرسال الملفات للطالب بدون ما تقول للطالب اسم الأداة
+- لو الطالب طلب أكتر من ملف، ابعتهم واحد ورا التاني باستخدام الأدوات
+- لو الملف صورة (jpg, png), استخدم send_file مع تحديد النوع
+- لو ملف نصي (.txt), اقراه وقول للطالب المحتوى بطريقة ودية
+- اتكلم بطريقة طبيعية ومصرية عامية دايماً
+
+تذكر: أنت AI Agent ذكي بتتعلم وبتتطور مع كل محادثة!`;
+}
 
 ## أدواتك:
 - **send_file**: لإرسال ملفات PDF للمحاضرات والملخصات (ابحث بكلمات من اسم الملف)
@@ -186,8 +229,19 @@ function searchMaterialsFolder(query) {
                     if (stats.isDirectory()) {
                         // البحث في المجلد الفرعي
                         searchDirectory(fullPath, item);
-                    } else if (stats.isFile() && item.endsWith('.pdf')) {
+                    } else if (stats.isFile()) {
                         const itemLower = item.toLowerCase();
+                        const fileExt = path.extname(item).toLowerCase();
+                        
+                        // تحديد نوع الملف
+                        let fileType = 'document';
+                        if (['.jpg', '.jpeg', '.png', '.gif', '.webp'].includes(fileExt)) {
+                            fileType = 'image';
+                        } else if (['.txt', '.md'].includes(fileExt)) {
+                            fileType = 'text';
+                        } else if (fileExt === '.pdf') {
+                            fileType = 'pdf';
+                        }
                         
                         // التحقق من التطابق مع الاستعلام
                         if (itemLower.includes(queryLower) || 
@@ -196,7 +250,9 @@ function searchMaterialsFolder(query) {
                                 fileName: item,
                                 fullPath: fullPath,
                                 category: category,
-                                relativePath: path.relative(materialsPath, fullPath)
+                                relativePath: path.relative(materialsPath, fullPath),
+                                fileType: fileType,
+                                extension: fileExt
                             });
                         }
                     }
@@ -243,8 +299,19 @@ function listAllMaterials() {
                     if (stats.isDirectory()) {
                         const newCategoryPath = [...categoryPath, item];
                         scanDirectory(fullPath, newCategoryPath);
-                    } else if (stats.isFile() && item.endsWith('.pdf')) {
+                    } else if (stats.isFile()) {
                         const category = categoryPath.join('/') || 'other';
+                        const fileExt = path.extname(item).toLowerCase();
+                        
+                        // تحديد نوع الملف
+                        let fileType = 'document';
+                        if (['.jpg', '.jpeg', '.png', '.gif', '.webp'].includes(fileExt)) {
+                            fileType = 'image';
+                        } else if (['.txt', '.md'].includes(fileExt)) {
+                            fileType = 'text';
+                        } else if (fileExt === '.pdf') {
+                            fileType = 'pdf';
+                        }
                         
                         if (!categories[category]) {
                             categories[category] = [];
@@ -254,7 +321,9 @@ function listAllMaterials() {
                             name: item,
                             path: fullPath,
                             category: category,
-                            size: stats.size
+                            size: stats.size,
+                            fileType: fileType,
+                            extension: fileExt
                         };
                         
                         categories[category].push(fileInfo);
@@ -321,13 +390,15 @@ function findFileInConfig(query) {
         const bestMatch = materialsResults[0];
         return {
             keywords: [query],
-            type: 'file',
+            type: bestMatch.fileType === 'image' ? 'image' : 'file',
             text: null,
             filePath: bestMatch.fullPath,
             caption: `📚 ${bestMatch.fileName}`,
             source: 'materials',
             fileName: bestMatch.fileName,
-            category: bestMatch.category
+            category: bestMatch.category,
+            fileType: bestMatch.fileType,
+            extension: bestMatch.extension
         };
     }
     
@@ -342,17 +413,21 @@ const tools = [
         type: "function",
         function: {
             name: "send_file",
-            description: "إرسال ملف PDF (محاضرة، ملخص، واجب) للطالب عندما يطلبه",
+            description: "إرسال ملف (PDF, صورة JPG/PNG, أو ملف نصي) للطالب. يمكن استخدامها عدة مرات لإرسال ملفات متعددة",
             parameters: {
                 type: "object",
                 properties: {
                     query: {
                         type: "string",
-                        description: "الكلمات المفتاحية للبحث عن الملف (مثل: ملخص المحاضرة الأولى محاسبة)"
+                        description: "الكلمات المفتاحية للبحث عن الملف (مثل: ملخص المحاضرة الأولى محاسبة، تكليف، صورة)"
                     },
                     reason: {
                         type: "string",
-                        description: "سبب إرسال الملف أو رسالة للطالب"
+                        description: "رسالة ودية بالمصري للطالب مع الملف (مثل: تمام يا فندم! اهو الملخص)"
+                    },
+                    caption: {
+                        type: "string",
+                        description: "شرح إضافي للملف (اختياري، للصور بشكل خاص)"
                     }
                 },
                 required: ["query", "reason"]
@@ -362,15 +437,32 @@ const tools = [
     {
         type: "function",
         function: {
+            name: "read_text_file",
+            description: "قراءة محتوى ملف نصي (.txt) وإرجاع محتواه للمناقشة مع الطالب",
+            parameters: {
+                type: "object",
+                properties: {
+                    query: {
+                        type: "string",
+                        description: "اسم أو كلمات مفتاحية للملف النصي"
+                    }
+                },
+                required: ["query"]
+            }
+        }
+    },
+    {
+        type: "function",
+        function: {
             name: "analyze_config",
-            description: "تحليل الملفات المتاحة في config.json لمعرفة ما هو موجود",
+            description: "عرض قائمة بجميع الملفات المتاحة في المجلدات",
             parameters: {
                 type: "object",
                 properties: {
                     category: {
                         type: "string",
                         enum: ["all", "lectures", "summaries", "assignments"],
-                        description: "نوع الموارد المراد تحليلها"
+                        description: "نوع الموارد المراد عرضها"
                     }
                 },
                 required: []
@@ -389,16 +481,45 @@ async function executeTool(toolName, toolArgs) {
     if (toolName === "send_file") {
         const fileInfo = findFileInConfig(toolArgs.query);
         if (fileInfo && fileInfo.filePath) {
+            // إضافة الكابشن إذا كان موجوداً
+            if (toolArgs.caption) {
+                fileInfo.caption = toolArgs.caption;
+            }
             return {
                 success: true,
                 action: "send_file",
                 fileInfo: fileInfo,
-                message: toolArgs.reason
+                message: toolArgs.reason,
+                fileType: fileInfo.fileType || 'pdf'
             };
         } else {
             return {
                 success: false,
-                message: "عذراً، لم أجد هذا الملف في الموارد المتاحة"
+                message: "مالقيتش الملف ده في المواد المتاحة"
+            };
+        }
+    } else if (toolName === "read_text_file") {
+        const fileInfo = findFileInConfig(toolArgs.query);
+        if (fileInfo && fileInfo.filePath && fileInfo.fileType === 'text') {
+            const content = readTextFile(fileInfo.filePath);
+            if (content) {
+                return {
+                    success: true,
+                    action: "text_content",
+                    content: content,
+                    fileName: fileInfo.fileName,
+                    message: `تمام! قريت الملف "${fileInfo.fileName}" ليك`
+                };
+            } else {
+                return {
+                    success: false,
+                    message: "مش قادر أقرا الملف ده"
+                };
+            }
+        } else {
+            return {
+                success: false,
+                message: "مالقيتش ملف نصي بالاسم ده"
             };
         }
     } else if (toolName === "analyze_config") {
@@ -500,7 +621,8 @@ export async function processWithGroqAI(userMessage, userId, userName = "الط�
             success: true,
             text: null,
             action: null,
-            fileInfo: null
+            fileInfo: null,
+            filesToSend: [] // دعم إرسال ملفات متعددة
         };
         
         // التعامل مع استدعاءات الأدوات (Tool Calls)
@@ -526,8 +648,15 @@ export async function processWithGroqAI(userMessage, userId, userName = "الط�
                 
                 // حفظ نتيجة الأداة للإرسال لاحقاً
                 if (toolResult.success && toolResult.action === "send_file") {
-                    finalResponse.action = "send_file";
-                    finalResponse.fileInfo = toolResult.fileInfo;
+                    finalResponse.filesToSend.push(toolResult.fileInfo);
+                    // للتوافق مع الكود القديم
+                    if (!finalResponse.action) {
+                        finalResponse.action = "send_file";
+                        finalResponse.fileInfo = toolResult.fileInfo;
+                    }
+                } else if (toolResult.success && toolResult.action === "text_content") {
+                    // إذا كان ملف نصي، أضف المحتوى للسياق
+                    finalResponse.textFileContent = toolResult.content;
                 }
             }
             

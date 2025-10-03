@@ -260,20 +260,71 @@ async function handleNewMessage(msg) {
                             console.log('✅ تم إرسال رد Groq AI');
                         }
                         
-                        // إرسال الملف إذا طلب البوت ذلك
-                        if (groqResponse.action === 'send_file' && groqResponse.fileInfo) {
+                        // إرسال الملفات إذا طلب البوت ذلك
+                        if (groqResponse.filesToSend && groqResponse.filesToSend.length > 0) {
+                            const fs = await import('fs');
+                            const path = await import('path');
+                            
+                            for (const fileInfo of groqResponse.filesToSend) {
+                                if (fileInfo.filePath && fs.existsSync(fileInfo.filePath)) {
+                                    const fileType = fileInfo.fileType || 'pdf';
+                                    
+                                    if (fileType === 'image') {
+                                        // إرسال صورة
+                                        await sock.sendMessage(groupJid, {
+                                            image: { url: fileInfo.filePath },
+                                            caption: fileInfo.caption || ''
+                                        });
+                                        console.log('✅ تم إرسال صورة من Groq AI');
+                                    } else if (fileType === 'text') {
+                                        // قراءة وإرسال محتوى الملف النصي
+                                        const content = fs.readFileSync(fileInfo.filePath, 'utf8');
+                                        await sock.sendMessage(groupJid, {
+                                            text: `📄 ${fileInfo.fileName}\n\n${content}`
+                                        });
+                                        console.log('✅ تم إرسال محتوى ملف نصي من Groq AI');
+                                    } else {
+                                        // إرسال PDF أو ملف آخر
+                                        await sock.sendMessage(groupJid, {
+                                            document: { url: fileInfo.filePath },
+                                            mimetype: fileType === 'pdf' ? 'application/pdf' : 'application/octet-stream',
+                                            fileName: path.basename(fileInfo.filePath),
+                                            caption: fileInfo.caption || '📚 تفضل الملف المطلوب'
+                                        });
+                                        console.log(`✅ تم إرسال ملف ${fileType} من Groq AI`);
+                                    }
+                                    
+                                    // تأخير صغير بين الملفات
+                                    await new Promise(resolve => setTimeout(resolve, 500));
+                                } else {
+                                    console.log(`❌ الملف غير موجود: ${fileInfo.filePath}`);
+                                }
+                            }
+                        }
+                        // الدعم القديم لملف واحد (للتوافق)
+                        else if (groqResponse.action === 'send_file' && groqResponse.fileInfo) {
                             const fileInfo = groqResponse.fileInfo;
                             const fs = await import('fs');
                             
                             if (fileInfo.filePath && fs.existsSync(fileInfo.filePath)) {
                                 const path = await import('path');
-                                await sock.sendMessage(groupJid, {
-                                    document: { url: fileInfo.filePath },
-                                    mimetype: 'application/pdf',
-                                    fileName: path.basename(fileInfo.filePath),
-                                    caption: fileInfo.caption || '📚 تفضل الملف المطلوب'
-                                });
-                                console.log('✅ تم إرسال ملف PDF من Groq AI');
+                                const fileType = fileInfo.fileType || 'pdf';
+                                
+                                if (fileType === 'image') {
+                                    await sock.sendMessage(groupJid, {
+                                        image: { url: fileInfo.filePath },
+                                        caption: fileInfo.caption || ''
+                                    });
+                                    console.log('✅ تم إرسال صورة من Groq AI');
+                                } else {
+                                    await sock.sendMessage(groupJid, {
+                                        document: { url: fileInfo.filePath },
+                                        mimetype: 'application/pdf',
+                                        fileName: path.basename(fileInfo.filePath),
+                                        caption: fileInfo.caption || '📚 تفضل الملف المطلوب'
+                                    });
+                                    console.log('✅ تم إرسال ملف PDF من Groq AI');
+                                }
                             } else {
                                 console.log(`❌ الملف غير موجود: ${fileInfo.filePath}`);
                                 await sock.sendMessage(groupJid, {
