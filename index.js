@@ -123,6 +123,51 @@ function getMentions(msg) {
 }
 
 /**
+ * تقسيم الرسائل الطويلة إلى أجزاء (حد Telegram: 4096 حرف)
+ */
+function splitLongMessage(text, maxLength = 4096) {
+    if (text.length <= maxLength) {
+        return [text];
+    }
+    
+    const chunks = [];
+    let currentChunk = '';
+    
+    // تقسيم النص إلى أسطر للحفاظ على التنسيق
+    const lines = text.split('\n');
+    
+    for (const line of lines) {
+        // إذا كان السطر نفسه أطول من الحد الأقصى، نقسمه
+        if (line.length > maxLength) {
+            // حفظ الجزء الحالي إذا كان موجوداً
+            if (currentChunk) {
+                chunks.push(currentChunk);
+                currentChunk = '';
+            }
+            
+            // تقسيم السطر الطويل إلى أجزاء
+            for (let i = 0; i < line.length; i += maxLength) {
+                chunks.push(line.substring(i, i + maxLength));
+            }
+        } else if ((currentChunk + '\n' + line).length > maxLength) {
+            // إذا كان إضافة السطر سيتجاوز الحد، نحفظ الجزء الحالي
+            chunks.push(currentChunk);
+            currentChunk = line;
+        } else {
+            // إضافة السطر إلى الجزء الحالي
+            currentChunk += (currentChunk ? '\n' : '') + line;
+        }
+    }
+    
+    // إضافة آخر جزء
+    if (currentChunk) {
+        chunks.push(currentChunk);
+    }
+    
+    return chunks;
+}
+
+/**
  * المعالج الرئيسي للرسائل الواردة
  */
 async function handleNewMessage(msg) {
@@ -138,7 +183,8 @@ async function handleNewMessage(msg) {
     const protocolMessages = [
         'senderKeyDistributionMessage', 
         'messageContextInfo',
-        'associatedChildMessage'  // رسالة مرتبطة - تظهر مع الردود على الوسائط
+        'associatedChildMessage',  // رسالة مرتبطة - تظهر مع الردود على الوسائط
+        'editedMessage'  // معلومات عن الرسالة المعدلة - تُعالج في handleMessageUpdate
     ];
     const actualMessageKey = messageKeys.find(key => !protocolMessages.includes(key));
     
@@ -233,14 +279,49 @@ async function handleNewMessage(msg) {
                     text + replyInfo + mentionInfo;
                 
                 try {
-                    const sentMsg = await telegramBot.telegram.sendMessage(
-                        targetChannel, 
-                        finalMessage, 
-                        { parse_mode: 'Markdown' }
-                    );
-                    messageCache.set(messageId, sentMsg.message_id);
-                    logTelegramMessage(targetChannel, messageType, true, sentMsg.message_id);
-                    console.log('✅ تم إرسال النص إلى Telegram');
+                    // تقسيم الرسالة إذا كانت طويلة جداً
+                    const messageChunks = splitLongMessage(finalMessage);
+                    let lastSentMsg;
+                    
+                    for (let i = 0; i < messageChunks.length; i++) {
+                        const chunk = messageChunks[i];
+                        const chunkPrefix = messageChunks.length > 1 ? `📄 (${i + 1}/${messageChunks.length})\n` : '';
+                        
+                        try {
+                            // محاولة الإرسال مع Markdown
+                            lastSentMsg = await telegramBot.telegram.sendMessage(
+                                targetChannel, 
+                                chunkPrefix + chunk, 
+                                { parse_mode: 'Markdown' }
+                            );
+                        } catch (parseError) {
+                            // إذا فشل Markdown، نعيد المحاولة بدون parse_mode
+                            if (parseError.message && parseError.message.includes("can't parse entities")) {
+                                console.log('⚠️ فشل تحليل Markdown، إعادة المحاولة بدون تنسيق');
+                                lastSentMsg = await telegramBot.telegram.sendMessage(
+                                    targetChannel, 
+                                    chunkPrefix + chunk
+                                );
+                            } else {
+                                throw parseError;
+                            }
+                        }
+                        
+                        // إضافة تأخير صغير بين الرسائل المتعددة لتجنب flood limits
+                        if (i < messageChunks.length - 1) {
+                            await new Promise(resolve => setTimeout(resolve, 100));
+                        }
+                    }
+                    
+                    // حفظ معرف آخر رسالة فقط
+                    messageCache.set(messageId, lastSentMsg.message_id);
+                    logTelegramMessage(targetChannel, messageType, true, lastSentMsg.message_id);
+                    
+                    if (messageChunks.length > 1) {
+                        console.log(`✅ تم إرسال النص إلى Telegram (${messageChunks.length} أجزاء)`);
+                    } else {
+                        console.log('✅ تم إرسال النص إلى Telegram');
+                    }
                     
                     // التحقق من التنبيهات الذكية
                     if (typeof text === 'string') {
@@ -248,7 +329,13 @@ async function handleNewMessage(msg) {
                         if (alert) {
                             // إرسال تنبيه
                             for (const notifyChannel of alert.channels) {
-                                await telegramBot.telegram.sendMessage(notifyChannel, alert.message, { parse_mode: 'Markdown' });
+                                try {
+                                    await telegramBot.telegram.sendMessage(notifyChannel, alert.message, { parse_mode: 'Markdown' });
+                                } catch (alertError) {
+                                    if (alertError.message && alertError.message.includes("can't parse entities")) {
+                                        await telegramBot.telegram.sendMessage(notifyChannel, alert.message);
+                                    }
+                                }
                             }
                         }
                     }
@@ -506,12 +593,54 @@ async function handleMessageUpdate(updates) {
                     
                     if (!targetChannel) continue;
                     
+                    // استخراج النص المعدل - البحث في editedMessage.message إذا كان موجوداً
+                    let editedText = null;
+                    let messageToUse = update.update.message;
+                    
+                    // إذا كان التحديث يحتوي على editedMessage، نستخدم محتواه
+                    if (update.update.message.editedMessage?.message) {
+                        messageToUse = update.update.message.editedMessage.message;
+                    }
+                    
+                    // استخراج النص من المكان الصحيح
+                    editedText = messageToUse.conversation || 
+                                messageToUse.extendedTextMessage?.text || 
+                                null;
+                    
+                    // محاولة 1: تعديل الرسالة مباشرة في Telegram (الأولوية)
+                    if (editedText) {
+                        try {
+                            const senderName = update.pushName || 'غير معروف';
+                            const finalEditedMessage = FORWARD_SENDER_NAME ? 
+                                buildCaption(senderName, editedText) : 
+                                editedText;
+                            
+                            await telegramBot.telegram.editMessageText(
+                                targetChannel,
+                                telegramMsgId,
+                                undefined,
+                                finalEditedMessage,
+                                { parse_mode: 'Markdown' }
+                            );
+                            console.log('✏️ تم تعديل الرسالة في Telegram');
+                            continue; // نجح التعديل، ننتقل للتحديث التالي
+                        } catch (editError) {
+                            console.log('⚠️ فشل تعديل الرسالة مباشرة، سيتم حذفها وإعادة إرسالها');
+                            // نكمل للطريقة الاحتياطية (حذف وإعادة إرسال)
+                        }
+                    }
+                    
+                    // محاولة 2 (احتياطية): حذف وإعادة إرسال
                     try {
                         await telegramBot.telegram.deleteMessage(targetChannel, telegramMsgId);
                         console.log('✏️ تم حذف النسخة القديمة من Telegram');
                     } catch (e) {
                         console.log('⚠️ لم يتم العثور على الرسالة القديمة للحذف');
                     }
+                    
+                    // حذف الإدخال من الكاش قبل إرسال النسخة الجديدة
+                    // هذا مهم لتجنب مشاكل عند التعديلات المتكررة
+                    messageCache.del(messageId);
                     
                     // إنشاء رسالة محدثة مع الحفاظ على جميع المعلومات الضرورية
                     const updatedMsg = {
@@ -520,7 +649,7 @@ async function handleMessageUpdate(updates) {
                             remoteJid: groupJid, // تأكد من وجود remoteJid
                             id: messageId
                         },
-                        message: update.update.message,
+                        message: messageToUse, // استخدام الرسالة الصحيحة (من editedMessage.message إذا كان موجوداً)
                         pushName: update.pushName || 'غير معروف',
                         messageTimestamp: update.messageTimestamp || Date.now()
                     };
@@ -528,6 +657,8 @@ async function handleMessageUpdate(updates) {
                     // إرسال الرسالة المعدلة
                     await handleNewMessage(updatedMsg);
                     console.log('✅ تم إرسال النسخة المعدلة إلى Telegram');
+                } else {
+                    console.log('ℹ️  رسالة معدلة لكن لا يوجد معرف في الكاش - ربما رسالة قديمة');
                 }
             }
         }
@@ -611,36 +742,91 @@ async function connectToWhatsApp() {
             try {
                 const me = sock.user;
                 if (me && me.id) {
-                    const myPhone = me.id.split(':')[0].replace(/\D/g, '');
-                    const myLid = me.lid || null;
+                    // استخراج رقم الهاتف بعدة طرق للتأكد
+                    let myPhone = null;
+                    let myLid = null;
+                    
+                    // الطريقة 1: من me.id (الأساسية)
+                    if (me.id) {
+                        const phoneMatch = me.id.split(':')[0];
+                        if (phoneMatch) {
+                            myPhone = phoneMatch.replace(/\D/g, '');
+                        }
+                    }
+                    
+                    // الطريقة 2: من me.lid إذا كان متوفراً
+                    if (me.lid) {
+                        myLid = me.lid;
+                    }
+                    
+                    // الطريقة 3: من sock.authState.creds (احتياطية)
+                    if (!myPhone && sock.authState?.creds?.me?.id) {
+                        const altPhone = sock.authState.creds.me.id.split(':')[0];
+                        if (altPhone) {
+                            myPhone = altPhone.replace(/\D/g, '');
+                        }
+                    }
+                    
+                    // الطريقة 4: من sock.authState.creds.me.lid (احتياطية)
+                    if (!myLid && sock.authState?.creds?.me?.lid) {
+                        myLid = sock.authState.creds.me.lid;
+                    }
+                    
+                    console.log(`📱 معلومات البوت المستخرجة:`);
+                    console.log(`   رقم الهاتف: ${myPhone || 'غير متوفر'}`);
+                    console.log(`   LID: ${myLid || 'غير متوفر'}`);
                     
                     const config = loadConfig();
                     let updated = false;
+                    const addedNumbers = [];
                     
-                    // إضافة رقم الهاتف إلى النخبة
-                    if (myPhone && !config.eliteUsers.includes(myPhone)) {
-                        config.eliteUsers.push(myPhone);
-                        updated = true;
-                        console.log(`✅ تم إضافة رقمك (${myPhone}) تلقائياً إلى قائمة النخبة`);
+                    // إضافة رقم الهاتف إلى النخبة (إجباري)
+                    if (myPhone) {
+                        if (!config.eliteUsers.includes(myPhone)) {
+                            config.eliteUsers.push(myPhone);
+                            updated = true;
+                            addedNumbers.push(`رقم الهاتف: ${myPhone}`);
+                            console.log(`✅ تم إضافة رقمك (${myPhone}) تلقائياً إلى قائمة النخبة`);
+                        } else {
+                            console.log(`ℹ️  رقمك (${myPhone}) موجود بالفعل في قائمة النخبة`);
+                        }
+                    } else {
+                        console.log('⚠️ تحذير: لم نتمكن من استخراج رقم الهاتف!');
                     }
                     
-                    // إضافة LID إلى النخبة إذا كان متوفراً
-                    if (myLid && !config.eliteUsers.includes(myLid)) {
-                        config.eliteUsers.push(myLid);
-                        updated = true;
-                        console.log(`✅ تم إضافة LID (${myLid}) تلقائياً إلى قائمة النخبة`);
+                    // إضافة LID إلى النخبة (إجباري إذا كان متوفراً)
+                    if (myLid) {
+                        if (!config.eliteUsers.includes(myLid)) {
+                            config.eliteUsers.push(myLid);
+                            updated = true;
+                            addedNumbers.push(`LID: ${myLid}`);
+                            console.log(`✅ تم إضافة LID (${myLid}) تلقائياً إلى قائمة النخبة`);
+                        } else {
+                            console.log(`ℹ️  LID (${myLid}) موجود بالفعل في قائمة النخبة`);
+                        }
+                    } else {
+                        console.log('ℹ️  LID غير متوفر (هذا طبيعي في بعض الحسابات)');
                     }
                     
                     // حفظ التحديثات في config.json
                     if (updated) {
-                        saveConfig(config);
-                        console.log('💾 تم حفظ بياناتك في config.json');
+                        const saved = saveConfig(config);
+                        if (saved) {
+                            console.log('💾 تم حفظ بياناتك في config.json');
+                            console.log(`   تم إضافة: ${addedNumbers.join(', ')}`);
+                        } else {
+                            console.log('❌ فشل حفظ البيانات في config.json');
+                        }
                     }
                     
                     // حفظ الرقم في ملف .env
                     if (myPhone) {
-                        savePhoneToEnv(myPhone, myLid);
-                        console.log('💾 تم حفظ رقمك في ملف .env');
+                        const envSaved = savePhoneToEnv(myPhone, myLid);
+                        if (envSaved) {
+                            console.log('💾 تم حفظ رقمك في ملف .env');
+                        } else {
+                            console.log('⚠️ لم نتمكن من حفظ الرقم في .env');
+                        }
                     }
                     
                     console.log('\n🎉 يمكنك الآن استخدام جميع الأوامر من أي محادثة في الواتس!');
