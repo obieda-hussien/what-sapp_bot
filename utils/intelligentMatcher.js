@@ -12,7 +12,7 @@
 /**
  * تطبيع النص العربي - إزالة التشكيل والحروف المتشابهة
  */
-function normalizeArabicText(text) {
+export function normalizeArabicText(text) {
     if (!text) return '';
     
     return text
@@ -64,7 +64,7 @@ function levenshteinDistance(str1, str2) {
 /**
  * حساب نسبة التشابه بين نصين (0-100)
  */
-function calculateSimilarity(str1, str2) {
+export function calculateSimilarity(str1, str2) {
     const normalized1 = normalizeArabicText(str1);
     const normalized2 = normalizeArabicText(str2);
     
@@ -153,7 +153,7 @@ function calculateProximityScore(messageText, keyword) {
 /**
  * تحليل المشاعر من النص (Sentiment Analysis)
  */
-function detectSentiment(messageText) {
+export function detectSentiment(messageText) {
     const text = normalizeArabicText(messageText);
     
     const sentiments = {
@@ -174,7 +174,7 @@ function detectSentiment(messageText) {
 /**
  * تحليل السياق من النص (Context Analysis)
  */
-function analyzeContext(messageText) {
+export function analyzeContext(messageText) {
     const text = normalizeArabicText(messageText);
     
     const contexts = {
@@ -198,7 +198,7 @@ function analyzeContext(messageText) {
 /**
  * تحليل النية من النص (Intent Recognition)
  */
-function detectIntent(messageText) {
+export function detectIntent(messageText) {
     const text = normalizeArabicText(messageText);
     
     const intents = {
@@ -392,7 +392,7 @@ export const ArabicProcessor = {
             'فين': ['اين', 'وين', 'وش مكان'],
             'ايه': ['ما', 'ماذا', 'شنو', 'وش'],
             // كلمات تعليمية
-            'محاضرة': ['درس', 'حصة', 'لكتشر', 'lecture', 'كلاس'],
+            'محاضره': ['درس', 'حصة', 'لكتشر', 'lecture', 'كلاس'],
             'ملخص': ['تلخيص', 'مراجعة', 'summary', 'خلاصة'],
             'اسايمنت': ['واجب', 'تمرين', 'assignment', 'تكليف', 'homework'],
             // كلمات التحية
@@ -402,7 +402,7 @@ export const ArabicProcessor = {
             // كلمات الشكر
             'شكرا': ['مشكور', 'ثانكس', 'thanks', 'thank you', 'ممنون', 'تسلم'],
             // كلمات الوداع
-            'مع السلامة': ['باي', 'bye', 'وداعا', 'الى اللقاء', 'بالسلامة'],
+            'مع السلامه': ['باي', 'bye', 'وداعا', 'الى اللقاء', 'بالسلامة'],
             // كلمات الاستفسار
             'كيف حالك': ['ايه اخبارك', 'شلونك', 'عامل ايه', 'how are you', 'كيفك'],
             'ممكن': ['لو سمحت', 'من فضلك', 'please', 'ياريت']
