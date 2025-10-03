@@ -151,16 +151,65 @@ function calculateProximityScore(messageText, keyword) {
 }
 
 /**
+ * تحليل المشاعر من النص (Sentiment Analysis)
+ */
+function detectSentiment(messageText) {
+    const text = normalizeArabicText(messageText);
+    
+    const sentiments = {
+        positive: ['جميل', 'رائع', 'ممتاز', 'شكرا', 'تمام', 'حلو', 'كويس', 'زين', 'احسنت', 'بارك', 'جزاك'],
+        negative: ['سيء', 'مش كويس', 'مو زين', 'غلط', 'خطا', 'مش تمام', 'مش حلو', 'احا', 'تعبان'],
+        neutral: ['عادي', 'ماشي', 'ok', 'اوكي']
+    };
+    
+    for (const [sentiment, keywords] of Object.entries(sentiments)) {
+        if (keywords.some(kw => text.includes(kw))) {
+            return sentiment;
+        }
+    }
+    
+    return 'neutral';
+}
+
+/**
+ * تحليل السياق من النص (Context Analysis)
+ */
+function analyzeContext(messageText) {
+    const text = normalizeArabicText(messageText);
+    
+    const contexts = {
+        education: ['محاضرة', 'درس', 'دراسة', 'امتحان', 'اختبار', 'واجب', 'اسايمنت', 'ملخص', 'شرح', 'مادة', 'كتاب'],
+        time: ['صباح', 'مساء', 'ليل', 'نهار', 'الان', 'بكرة', 'امس', 'اليوم', 'غدا'],
+        location: ['فين', 'اين', 'وين', 'هنا', 'هناك', 'مكان'],
+        help: ['ساعدني', 'عاوز مساعدة', 'محتاج مساعدة', 'ممكن تساعدني', 'ساعد'],
+        social: ['كيف حالك', 'ايه اخبارك', 'شلونك', 'عامل ايه', 'انت منين', 'اسمك ايه']
+    };
+    
+    const detectedContexts = [];
+    for (const [context, keywords] of Object.entries(contexts)) {
+        if (keywords.some(kw => text.includes(kw))) {
+            detectedContexts.push(context);
+        }
+    }
+    
+    return detectedContexts.length > 0 ? detectedContexts : ['general'];
+}
+
+/**
  * تحليل النية من النص (Intent Recognition)
  */
 function detectIntent(messageText) {
     const text = normalizeArabicText(messageText);
     
     const intents = {
-        question: ['ايه', 'ازاي', 'فين', 'امتي', 'ليه', 'كيف', 'متى', 'اين', 'لماذا', 'هل', 'ممكن', 'ينفع'],
-        request: ['عايز', 'محتاج', 'ابغي', 'اريد', 'ممكن', 'لو سمحت', 'من فضلك'],
-        greeting: ['السلام', 'صباح', 'مساء', 'مرحبا', 'اهلا', 'هاي', 'هلو'],
-        gratitude: ['شكرا', 'مشكور', 'ممنون', 'تسلم', 'يعطيك']
+        question: ['ايه', 'ازاي', 'فين', 'امتي', 'ليه', 'كيف', 'متى', 'اين', 'لماذا', 'هل', 'ممكن', 'ينفع', 'شنو', 'منو', 'وش'],
+        request: ['عايز', 'محتاج', 'ابغي', 'اريد', 'ممكن', 'لو سمحت', 'من فضلك', 'بدي', 'ابي'],
+        greeting: ['السلام', 'صباح', 'مساء', 'مرحبا', 'اهلا', 'هاي', 'هلو', 'سلام', 'هلا', 'تحية'],
+        farewell: ['باي', 'مع السلامة', 'الى اللقاء', 'وداعا', 'بالسلامة', 'تصبح على خير'],
+        gratitude: ['شكرا', 'مشكور', 'ممنون', 'تسلم', 'يعطيك', 'جزاك الله', 'بارك الله'],
+        apology: ['اسف', 'معذرة', 'عفوا', 'سامحني', 'آسف', 'اعتذر'],
+        confirmation: ['نعم', 'اه', 'ايوه', 'صح', 'اكيد', 'طبعا', 'yes', 'يب'],
+        negation: ['لا', 'لاء', 'مش', 'ما', 'no', 'كلا']
     };
     
     for (const [intent, keywords] of Object.entries(intents)) {
@@ -191,7 +240,9 @@ export function intelligentKeywordMatch(messageText, keyword, options = {}) {
         partialMatch: false,
         similarity: 0,
         proximity: 0,
-        intent: null
+        intent: null,
+        sentiment: null,
+        context: []
     };
     
     // 1. التطابق الدقيق (بعد التطبيع)
@@ -226,8 +277,15 @@ export function intelligentKeywordMatch(messageText, keyword, options = {}) {
     details.proximity = proximity;
     totalScore += proximity * proximityWeight;
     
-    // 5. تحليل النية
+    // 5. تحليل النية والمشاعر والسياق
     details.intent = detectIntent(messageText);
+    details.sentiment = detectSentiment(messageText);
+    details.context = analyzeContext(messageText);
+    
+    // منح نقاط إضافية للمطابقة الذكية عند التطابق مع النية والسياق
+    if (details.intent === 'greeting' || details.intent === 'gratitude') {
+        totalScore += 10; // نقاط إضافية للتحيات والشكر
+    }
     
     // تطبيع النتيجة النهائية (0-100)
     const finalScore = Math.min(100, Math.max(0, totalScore));
@@ -279,18 +337,21 @@ export function findBestMatch(messageText, keywords, options = {}) {
 export function analyzeMatch(messageText, keyword) {
     const result = intelligentKeywordMatch(messageText, keyword);
     
-    console.log('=== تحليل المطابقة ===');
+    console.log('=== تحليل المطابقة الذكية ===');
     console.log(`الرسالة: ${messageText}`);
     console.log(`الكلمة المفتاحية: ${keyword}`);
     console.log(`النتيجة النهائية: ${result.score.toFixed(2)}`);
     console.log(`متطابق؟ ${result.matched ? '✅ نعم' : '❌ لا'}`);
-    console.log('\nالتفاصيل:');
-    console.log(`  تطابق دقيق: ${result.details.exactMatch ? '✅' : '❌'}`);
-    console.log(`  تطابق تقريبي: ${result.details.fuzzyMatch ? '✅' : '❌'}`);
-    console.log(`  تطابق جزئي: ${result.details.partialMatch ? '✅' : '❌'}`);
-    console.log(`  نسبة التشابه: ${result.details.similarity}%`);
-    console.log(`  درجة القرب: ${result.details.proximity.toFixed(2)}`);
-    console.log(`  النية المكتشفة: ${result.details.intent}`);
+    console.log('\n📊 التفاصيل:');
+    console.log(`  ✓ تطابق دقيق: ${result.details.exactMatch ? '✅' : '❌'}`);
+    console.log(`  ✓ تطابق تقريبي: ${result.details.fuzzyMatch ? '✅' : '❌'}`);
+    console.log(`  ✓ تطابق جزئي: ${result.details.partialMatch ? '✅' : '❌'}`);
+    console.log(`  ✓ نسبة التشابه: ${result.details.similarity}%`);
+    console.log(`  ✓ درجة القرب: ${result.details.proximity.toFixed(2)}`);
+    console.log(`\n🧠 التحليل الذكي:`);
+    console.log(`  ✓ النية: ${result.details.intent}`);
+    console.log(`  ✓ المشاعر: ${result.details.sentiment}`);
+    console.log(`  ✓ السياق: ${result.details.context.join(', ')}`);
     
     return result;
 }
@@ -325,13 +386,26 @@ export const ArabicProcessor = {
      */
     getSynonyms(word) {
         const synonyms = {
-            'عايز': ['محتاج', 'ابغي', 'اريد'],
-            'ازاي': ['كيف', 'بأي طريقة'],
-            'فين': ['اين', 'وين'],
-            'ايه': ['ما', 'ماذا', 'شنو'],
-            'محاضرة': ['درس', 'حصة', 'لكتشر'],
-            'ملخص': ['تلخيص', 'مراجعة', 'summary'],
-            'اسايمنت': ['واجب', 'تمرين', 'assignment']
+            // كلمات الطلب
+            'عايز': ['محتاج', 'ابغي', 'اريد', 'بدي', 'ابي'],
+            'ازاي': ['كيف', 'بأي طريقة', 'وش الطريقة'],
+            'فين': ['اين', 'وين', 'وش مكان'],
+            'ايه': ['ما', 'ماذا', 'شنو', 'وش'],
+            // كلمات تعليمية
+            'محاضرة': ['درس', 'حصة', 'لكتشر', 'lecture', 'كلاس'],
+            'ملخص': ['تلخيص', 'مراجعة', 'summary', 'خلاصة'],
+            'اسايمنت': ['واجب', 'تمرين', 'assignment', 'تكليف', 'homework'],
+            // كلمات التحية
+            'السلام عليكم': ['سلام', 'السلام', 'مرحبا', 'اهلا', 'هلا'],
+            'صباح الخير': ['صباحو', 'صباح النور', 'good morning', 'صباح'],
+            'مساء الخير': ['مساءو', 'مساء النور', 'good evening', 'مساء'],
+            // كلمات الشكر
+            'شكرا': ['مشكور', 'ثانكس', 'thanks', 'thank you', 'ممنون', 'تسلم'],
+            // كلمات الوداع
+            'مع السلامة': ['باي', 'bye', 'وداعا', 'الى اللقاء', 'بالسلامة'],
+            // كلمات الاستفسار
+            'كيف حالك': ['ايه اخبارك', 'شلونك', 'عامل ايه', 'how are you', 'كيفك'],
+            'ممكن': ['لو سمحت', 'من فضلك', 'please', 'ياريت']
         };
         
         const normalized = normalizeArabicText(word);
@@ -345,5 +419,8 @@ export default {
     analyzeMatch,
     normalizeArabicText,
     calculateSimilarity,
+    detectIntent,
+    detectSentiment,
+    analyzeContext,
     ArabicProcessor
 };

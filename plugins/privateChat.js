@@ -52,10 +52,12 @@ export function checkPrivateChatKeyword(messageText, useIntelligentMatching = tr
         if (matchResult) {
             const responseConfig = keywordMap.get(matchResult.keyword);
             
-            console.log(`🎯 نظام المطابقة الذكية:`);
+            console.log(`🎯 نظام المطابقة الذكية المتقدم:`);
             console.log(`   الكلمة المطابقة: ${matchResult.keyword}`);
             console.log(`   درجة الثقة: ${(matchResult.confidence * 100).toFixed(1)}%`);
             console.log(`   النية المكتشفة: ${matchResult.details.intent}`);
+            console.log(`   المشاعر: ${matchResult.details.sentiment}`);
+            console.log(`   السياق: ${matchResult.details.context.join(', ')}`);
             
             return {
                 keyword: matchResult.keyword,
