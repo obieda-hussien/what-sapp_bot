@@ -137,11 +137,13 @@ GROQ_API_KEY=gsk_your_api_key_here
 
 ### النموذج المستخدم
 
-**llama-3.1-70b-versatile**
+**llama-3.3-70b-versatile** (محدث)
 - 70 مليار معامل (parameter)
 - سريع جداً (500+ tokens/sec)
 - يفهم العربية بشكل ممتاز
 - سياق يصل إلى 32K tokens
+
+> **ملاحظة**: تم تحديث النموذج من `llama-3.1-70b-versatile` إلى `llama-3.3-70b-versatile` بسبب إيقاف النموذج القديم
 
 ## ⚙️ الإعدادات المتقدمة
 
@@ -154,7 +156,7 @@ const MAX_MEMORY_MESSAGES = 20; // غيّر هذا الرقم
 ### تغيير النموذج
 في ملف `utils/groqAssistant.js`:
 ```javascript
-model: "llama-3.1-70b-versatile" // أو "mixtral-8x7b-32768"
+model: "llama-3.3-70b-versatile" // أو "llama-3.1-8b-instant" للسرعة الفائقة
 ```
 
 ### تعديل System Prompt

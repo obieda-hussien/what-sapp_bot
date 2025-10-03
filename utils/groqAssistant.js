@@ -304,7 +304,7 @@ export async function processWithGroqAI(userMessage, userId, userName = "الط�
         
         // الطلب الأول للحصول على الرد
         let response = await groq.chat.completions.create({
-            model: "llama-3.1-70b-versatile", // أو "mixtral-8x7b-32768"
+            model: "llama-3.3-70b-versatile", // النموذج المحدث - كان: "llama-3.1-70b-versatile"
             messages: messages,
             tools: tools,
             tool_choice: "auto",
@@ -350,7 +350,7 @@ export async function processWithGroqAI(userMessage, userId, userName = "الط�
             
             // طلب ثانٍ للحصول على الرد النهائي بعد تنفيذ الأدوات
             response = await groq.chat.completions.create({
-                model: "llama-3.1-70b-versatile",
+                model: "llama-3.3-70b-versatile", // النموذج المحدث
                 messages: messages,
                 temperature: 0.7,
                 max_tokens: 1024
