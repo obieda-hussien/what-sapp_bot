@@ -65,9 +65,26 @@ export function isCommand(text) {
  * استخراج الأمر والمعاملات
  */
 function parseCommand(text) {
-    const parts = text.trim().split(/\s+/);
-    const command = parts[0].substring(1); // إزالة النقطة
-    const args = parts.slice(1);
+    const trimmedText = text.trim();
+    const firstSpaceIndex = trimmedText.indexOf(' ');
+    
+    if (firstSpaceIndex === -1) {
+        // أمر بدون معاملات
+        return { command: trimmedText.substring(1), args: [] };
+    }
+    
+    const command = trimmedText.substring(1, firstSpaceIndex); // إزالة النقطة
+    const restOfText = trimmedText.substring(firstSpaceIndex + 1);
+    
+    // تقسيم المعاملات بناءً على النوع
+    // بالنسبة لأمر اضافة_رد، نحتاج للحفاظ على المسافات والأسطر الجديدة
+    const args = [restOfText.split(/\s+/)[0]]; // النوع (أول كلمة)
+    const remainingText = restOfText.substring(args[0].length).trimStart();
+    
+    if (remainingText) {
+        args.push(remainingText); // باقي النص بدون تعديل
+    }
+    
     return { command, args };
 }
 
@@ -796,7 +813,7 @@ async function handleAddPrivateResponseCommand(args) {
     }
     
     const responseType = args[0];
-    const restArgs = args.slice(1).join(' ');
+    const restArgs = args.length > 1 ? args[1] : '';
     
     // التحقق من نوع الرد
     const validTypes = {
@@ -818,7 +835,12 @@ async function handleAddPrivateResponseCommand(args) {
     }
     
     // تقسيم الكلمات المفتاحية والمحتوى
-    const parts = restArgs.split('|').map(p => p.trim());
+    // استخدام trim فقط على الأطراف الخارجية، مع الحفاظ على الأسطر الجديدة داخل النص
+    const parts = restArgs.split('|').map((p, index) => {
+        // نحتفظ بالمسافات والأسطر الجديدة في منتصف النص
+        // نزيل فقط المسافات من البداية والنهاية
+        return p.replace(/^\s+|\s+$/g, '');
+    });
     
     const type = validTypes[responseType];
     
@@ -842,14 +864,14 @@ async function handleAddPrivateResponseCommand(args) {
     let filePath = null;
     
     if (type === 'text') {
-        // تحويل \n إلى سطر جديد فعلي
-        text = parts[1].replace(/\\n/g, '\n');
+        // الحفاظ على الأسطر الجديدة كما هي من الرسالة الأصلية
+        text = parts[1];
     } else if (type === 'image' || type === 'document') {
         filePath = parts[1];
     } else if (type === 'both') {
         // في حالة both، نتوقع كلمات مفتاحية | نص | مسار الملف
-        // تحويل \n إلى سطر جديد فعلي
-        text = parts[1].replace(/\\n/g, '\n');
+        // الحفاظ على الأسطر الجديدة كما هي من الرسالة الأصلية
+        text = parts[1];
         filePath = parts[2];
     }
     
