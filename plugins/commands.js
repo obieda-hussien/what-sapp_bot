@@ -842,12 +842,14 @@ async function handleAddPrivateResponseCommand(args) {
     let filePath = null;
     
     if (type === 'text') {
-        text = parts[1];
+        // تحويل \n إلى سطر جديد فعلي
+        text = parts[1].replace(/\\n/g, '\n');
     } else if (type === 'image' || type === 'document') {
         filePath = parts[1];
     } else if (type === 'both') {
         // في حالة both، نتوقع كلمات مفتاحية | نص | مسار الملف
-        text = parts[1];
+        // تحويل \n إلى سطر جديد فعلي
+        text = parts[1].replace(/\\n/g, '\n');
         filePath = parts[2];
     }
     
