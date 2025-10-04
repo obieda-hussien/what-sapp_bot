@@ -383,3 +383,37 @@ export function removeFromBlacklist(phoneNumber) {
     config.filters.blacklist = config.filters.blacklist.filter(num => num !== phoneNumber);
     return saveConfig(config);
 }
+
+/**
+ * إضافة كلمة للفلتر (الكلمات المفتاحية)
+ */
+export function addKeywordToFilter(keyword) {
+    const config = loadConfig();
+    if (!config.filters.keywords.includes(keyword)) {
+        config.filters.keywords.push(keyword);
+        return saveConfig(config);
+    }
+    return false;
+}
+
+/**
+ * حذف كلمة من الفلتر (الكلمات المفتاحية)
+ */
+export function removeKeywordFromFilter(keyword) {
+    const config = loadConfig();
+    const initialLength = config.filters.keywords.length;
+    config.filters.keywords = config.filters.keywords.filter(kw => kw !== keyword);
+    const removed = initialLength > config.filters.keywords.length;
+    if (removed) {
+        return saveConfig(config);
+    }
+    return false;
+}
+
+/**
+ * الحصول على قائمة كلمات الفلتر
+ */
+export function getFilterKeywords() {
+    const config = loadConfig();
+    return config.filters.keywords || [];
+}

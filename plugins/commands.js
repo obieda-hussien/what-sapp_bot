@@ -18,6 +18,9 @@ import {
     setFilterStatus,
     addToBlacklist,
     removeFromBlacklist,
+    addKeywordToFilter,
+    removeKeywordFromFilter,
+    getFilterKeywords,
     getTelegramChannel
 } from '../utils/config.js';
 
@@ -184,6 +187,18 @@ export async function handleCommand(msg, sock, telegramBot) {
             case 'تعطيل_فلتر':
             case 'disable_filter':
                 return await handleDisableFilterCommand();
+            
+            case 'اضافة_كلمة':
+            case 'add_keyword':
+                return await handleAddKeywordCommand(args);
+            
+            case 'حذف_كلمة':
+            case 'remove_keyword':
+                return await handleRemoveKeywordCommand(args);
+            
+            case 'الكلمات':
+            case 'keywords':
+                return await handleListKeywordsCommand();
             
             case 'المساعدة':
             case 'help':
@@ -658,6 +673,85 @@ async function handleDisableFilterCommand() {
 }
 
 /**
+ * أمر إضافة كلمة للفلتر
+ */
+async function handleAddKeywordCommand(args) {
+    if (args.length < 1) {
+        return {
+            handled: true,
+            response: '❌ الاستخدام الصحيح:\n.اضافة_كلمة <الكلمة>\n\nمثال:\n.اضافة_كلمة إعلان'
+        };
+    }
+    
+    const keyword = args[0];
+    const success = addKeywordToFilter(keyword);
+    
+    if (success) {
+        return {
+            handled: true,
+            response: `✅ تم إضافة الكلمة للفلتر بنجاح!\n\n🔑 الكلمة: ${keyword}\n\nℹ️ سيتم حظر الرسائل التي تحتوي على هذه الكلمة عند تفعيل الفلتر`
+        };
+    } else {
+        return {
+            handled: true,
+            response: '❌ الكلمة موجودة بالفعل في الفلتر'
+        };
+    }
+}
+
+/**
+ * أمر حذف كلمة من الفلتر
+ */
+async function handleRemoveKeywordCommand(args) {
+    if (args.length < 1) {
+        return {
+            handled: true,
+            response: '❌ الاستخدام الصحيح:\n.حذف_كلمة <الكلمة>\n\nمثال:\n.حذف_كلمة إعلان'
+        };
+    }
+    
+    const keyword = args[0];
+    const success = removeKeywordFromFilter(keyword);
+    
+    if (success) {
+        return {
+            handled: true,
+            response: `✅ تم حذف الكلمة من الفلتر بنجاح!\n\n🔑 الكلمة: ${keyword}`
+        };
+    } else {
+        return {
+            handled: true,
+            response: '❌ الكلمة غير موجودة في الفلتر'
+        };
+    }
+}
+
+/**
+ * أمر عرض قائمة كلمات الفلتر
+ */
+async function handleListKeywordsCommand() {
+    const keywords = getFilterKeywords();
+    
+    if (keywords.length === 0) {
+        return {
+            handled: true,
+            response: '📋 لا توجد كلمات في الفلتر حالياً\n\nاستخدم .اضافة_كلمة لإضافة كلمة جديدة'
+        };
+    }
+    
+    let message = '📋 الكلمات المفتاحية في الفلتر:\n\n';
+    keywords.forEach((keyword, index) => {
+        message += `${index + 1}. ${keyword}\n`;
+    });
+    message += `\n💡 عدد الكلمات: ${keywords.length}`;
+    
+    return {
+        handled: true,
+        response: message
+    };
+}
+
+/**
  * أمر المساعدة
  */
 async function handleHelpCommand() {
@@ -683,7 +777,10 @@ async function handleHelpCommand() {
                   `• *.حظر* <رقم الهاتف> - حظر مستخدم من نقل رسائله.\n` +
                   `• *.الغاء_حظر* <رقم الهاتف> - إزالة الحظر عن مستخدم.\n` +
                   `• *.تفعيل_فلتر* - تفعيل نظام الفلترة والقائمة السوداء.\n` +
-                  `• *.تعطيل_فلتر* - تعطيل نظام الفلترة، والسماح لجميع الرسائل بالمرور.\n\n` +
+                  `• *.تعطيل_فلتر* - تعطيل نظام الفلترة، والسماح لجميع الرسائل بالمرور.\n` +
+                  `• *.اضافة_كلمة* <كلمة> - إضافة كلمة مفتاحية للفلتر (حظر رسائل تحتويها).\n` +
+                  `• *.حذف_كلمة* <كلمة> - حذف كلمة من فلتر الكلمات المفتاحية.\n` +
+                  `• *.الكلمات* - عرض قائمة الكلمات المفتاحية في الفلتر.\n\n` +
                   `*🔔 التنبيهات الذكية:*\n` +
                   `• *.اضافة_تنبيه* <كلمة> - إضافة كلمة لتنبيهك عند ذكرها.\n` +
                   `• *.حذف_تنبيه* <كلمة> - حذف كلمة من قائمة التنبيهات.\n` +
