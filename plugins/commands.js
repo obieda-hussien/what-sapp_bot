@@ -156,7 +156,7 @@ export async function handleCommand(msg, sock, telegramBot) {
             
             case 'اضافة_نخبة':
             case 'add_elite':
-                return await handleAddEliteCommand(args);
+                return await handleAddEliteCommand(args, sock);
             
             case 'حذف_نخبة':
             case 'remove_elite':
@@ -495,9 +495,43 @@ async function handleListChannelsCommand() {
 }
 
 /**
+ * البحث عن LID للمستخدم من الجروبات
+ */
+async function findUserLID(sock, phoneNumber) {
+    try {
+        // البحث في جميع الجروبات
+        const groups = await sock.groupFetchAllParticipating();
+        
+        for (const groupId in groups) {
+            const group = groups[groupId];
+            
+            // البحث عن المستخدم في أعضاء الجروب
+            for (const participant of group.participants) {
+                const participantId = participant.id;
+                
+                // فحص إذا كان رقم الهاتف يطابق
+                if (participantId.startsWith(phoneNumber)) {
+                    // استخراج LID إذا كان موجوداً
+                    if (participantId.includes(':') && participantId.includes('@lid')) {
+                        console.log(`🔍 تم العثور على LID للمستخدم ${phoneNumber}: ${participantId}`);
+                        return participantId;
+                    }
+                }
+            }
+        }
+        
+        console.log(`ℹ️  لم يتم العثور على LID للمستخدم ${phoneNumber}`);
+        return null;
+    } catch (error) {
+        console.error('❌ خطأ في البحث عن LID:', error.message);
+        return null;
+    }
+}
+
+/**
  * أمر إضافة مستخدم للنخبة
  */
-async function handleAddEliteCommand(args) {
+async function handleAddEliteCommand(args, sock) {
     if (args.length < 1) {
         return {
             handled: true,
@@ -508,6 +542,7 @@ async function handleAddEliteCommand(args) {
     const addedItems = [];
     let phoneAdded = false;
     let lidAdded = false;
+    let phoneNumber = null;
     
     // معالجة جميع المعاملات (يمكن أن يكون رقم، LID، أو كلاهما)
     for (let i = 0; i < args.length; i++) {
@@ -527,11 +562,27 @@ async function handleAddEliteCommand(args) {
             // رقم الهاتف - نزيل أي شيء غير الأرقام
             const cleanPhone = identifier.replace(/\D/g, '');
             if (cleanPhone) {
+                phoneNumber = cleanPhone; // حفظ رقم الهاتف للبحث عن LID
                 const success = addEliteUser(cleanPhone);
                 if (success) {
                     addedItems.push(`رقم الهاتف: ${cleanPhone}`);
                     phoneAdded = true;
                 }
+            }
+        }
+    }
+    
+    // إذا تم إضافة رقم هاتف فقط ولم يتم إضافة LID، نحاول جلب LID تلقائياً
+    if (phoneAdded && !lidAdded && phoneNumber && sock) {
+        console.log(`🔎 البحث عن LID للمستخدم ${phoneNumber}...`);
+        const userLID = await findUserLID(sock, phoneNumber);
+        
+        if (userLID) {
+            // إضافة LID تلقائياً
+            const success = addEliteUser(userLID);
+            if (success) {
+                addedItems.push(`LID: ${userLID} (تم جلبه تلقائياً ✨)`);
+                lidAdded = true;
             }
         }
     }
