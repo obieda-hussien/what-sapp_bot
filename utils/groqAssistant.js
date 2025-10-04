@@ -206,6 +206,7 @@ function createSystemPrompt() {
 5. **Images with Captions**: Can send images with appropriate explanations
 6. **Materials Analysis**: Know all available files in folders and help students find what they need
 7. **Internet Search & Article Fetching**: Can search the internet for information in Arabic or English, fetch articles, and summarize them
+8. **Translation & Summarization**: Can translate English content to Arabic and provide concise summaries
 
 ## Smart Decision Making - When to Respond:
 - **DO respond** to: Questions, requests for files/information, greetings, academic help
@@ -683,6 +684,27 @@ const tools = [
     {
         type: "function",
         function: {
+            name: "fetch_and_summarize",
+            description: "جلب محتوى مقالة أو صفحة ويب وتلخيصها. استخدمها عندما يطلب الطالب تلخيص مقالة أو موضوع معين. يدعم الترجمة من الإنجليزية للعربية",
+            parameters: {
+                type: "object",
+                properties: {
+                    query: {
+                        type: "string",
+                        description: "موضوع البحث أو عنوان المقالة (بالعربية أو الإنجليزية)"
+                    },
+                    translate: {
+                        type: "boolean",
+                        description: "true إذا كان المحتوى بالإنجليزية ويحتاج ترجمة للعربية"
+                    }
+                },
+                required: ["query"]
+            }
+        }
+    },
+    {
+        type: "function",
+        function: {
             name: "web_search",
             description: "البحث في الإنترنت عن معلومات، تعريفات، شروحات، أو إجابات. استخدمها عندما يسأل الطالب عن معلومات عامة أو أحداث جارية أو مواضيع غير موجودة في الملفات",
             parameters: {
@@ -842,6 +864,45 @@ async function executeTool(toolName, toolArgs) {
                 message: "معلش، مالقيتش معلومات كافية عن الموضوع ده على النت"
             };
         }
+    } else if (toolName === "fetch_and_summarize") {
+        // جلب محتوى المقالة وتلخيصها
+        const searchResults = await webSearch(toolArgs.query);
+        
+        if (searchResults.found) {
+            let content = '';
+            
+            if (searchResults.abstract) {
+                content = searchResults.abstract;
+            } else if (searchResults.answer) {
+                content = searchResults.answer;
+            } else if (searchResults.definition) {
+                content = searchResults.definition;
+            } else if (searchResults.relatedTopics.length > 0) {
+                content = searchResults.relatedTopics.join('\n');
+            }
+            
+            if (content) {
+                // استخدام AI لتلخيص وترجمة المحتوى إذا لزم الأمر
+                const needsTranslation = toolArgs.translate || false;
+                const summaryPrompt = needsTranslation
+                    ? `لخص النص التالي بالعربية (ترجمه إذا كان بالإنجليزية):\n\n${content.substring(0, 2000)}`
+                    : `لخص النص التالي بشكل مختصر:\n\n${content.substring(0, 2000)}`;
+                
+                return {
+                    success: true,
+                    action: "article_summary",
+                    content: content.substring(0, 2000),
+                    needsSummary: true,
+                    summaryPrompt: summaryPrompt,
+                    message: `لقيت معلومات عن "${toolArgs.query}"`
+                };
+            }
+        }
+        
+        return {
+            success: false,
+            message: `معلش، مالقيتش محتوى كافي عن "${toolArgs.query}"`
+        };
     }
     
     return { success: false, message: "أداة غير معروفة" };
