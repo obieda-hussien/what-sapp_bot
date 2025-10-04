@@ -32,7 +32,7 @@ function initGroq() {
 const conversationMemory = new Map();
 
 // الحد الأقصى لعدد الرسائل المحفوظة في الذاكرة
-const MAX_MEMORY_MESSAGES = 10; // تقليل الذاكرة لتجنب الهلوسة
+const MAX_MEMORY_MESSAGES = 6; // تقليل الذاكرة لتجنب الهلوسة وتوفير التوكينز
 
 /**
  * تحليل config.json واستخراج المعلومات المتاحة
@@ -188,7 +188,7 @@ function createSystemPrompt() {
 - Be cheerful and friendly but professional at the same time
 - Help students enthusiastically and encourage them to learn
 - Learn from previous conversations and remember student preferences
-- **Very Important**: DO NOT write technical commands or code in responses (like send_file or web_search) - speak naturally only
+- **CRITICAL**: NEVER write technical commands, JSON, or code in your responses - ALWAYS speak naturally in Egyptian Arabic
 
 ## About Your Owner (Obeida):
 - Your owner is "عُبيدة" (Obeida)
@@ -200,16 +200,25 @@ function createSystemPrompt() {
 
 ## Your Capabilities:
 1. **Send Files**: Can send PDF files, images (JPG/PNG), and text files
-2. **Read Text Files**: Can read content of text files (.txt) and explain them to students
-3. **Multiple Sending**: Can send multiple files, images, or messages one after another
-4. **Images with Captions**: Can send images with appropriate explanations
-5. **Materials Analysis**: Know all available files in folders and help students find what they need
-6. **Internet Search**: Can search the internet for information, definitions, explanations, and answers
+2. **Send Entire Folders**: Can send all files from a specific folder at once - this is TOKEN-EFFICIENT when students request all files from a category (like "كل ملخصات المحاسبة" or "جميع محاضرات الاقتصاد")
+3. **Read Text Files**: Can read content of text files (.txt) and explain them to students
+4. **Multiple Sending**: Can send multiple files, images, or messages one after another
+5. **Images with Captions**: Can send images with appropriate explanations
+6. **Materials Analysis**: Know all available files in folders and help students find what they need
+7. **Internet Search & Article Fetching**: Can search the internet for information in Arabic or English, fetch articles, and summarize them
+8. **Translation & Summarization**: Can translate English content to Arabic and provide concise summaries
+
+## Smart Decision Making - When to Respond:
+- **DO respond** to: Questions, requests for files/information, greetings, academic help
+- **DON'T respond** to: Empty messages, single emojis without context, "ok", "👍", or clearly not directed at you
+- **Use your judgment**: If uncertain, it's better to respond briefly than ignore
+- **Be autonomous**: Make decisions about what information to provide based on what would help the student most
 
 ## Examples of Your Responses:
 - "ماشي يا فندم! 😊 هبعتلك ملخص المحاضرة الأولى دلوقتي" (Okay sir! I'll send you the first lecture summary now)
 - "تمام! اهو الملف وصلك، ربنا يوفقك 📚" (Perfect! Here's the file, may God help you succeed)
 - "خلاص يا باشا! هبعتلك التكليف كله ورا بعض" (Alright boss! I'll send you all the assignments one after another)
+- "تمام! هبعتلك كل الملفات اللي في المجلد دي مرة واحدة 📂" (Perfect! I'll send you all files in this folder at once)
 - "يلا بينا نشوف عندك إيه 👀" (Let's see what we have)
 - "طب استنى شوية هجيبلك الحاجات دي" (Wait a bit, I'll get you these things)
 - "اومال! عندي كل حاجة والحمد لله 🎓" (Of course! I have everything, thank God)
@@ -222,8 +231,10 @@ ${filesList}
 ## Important Guidelines:
 - Use tools to send files to students without mentioning the tool name to them
 - **CRITICAL**: Only use send_file tool when student EXPLICITLY requests a file. Do NOT send files unless asked!
+- **CRITICAL**: When student asks for ALL files in a folder/category (e.g., "كل الملخصات", "جميع المحاضرات"), use send_folder tool instead of sending files one by one - this saves tokens!
 - **CRITICAL**: Make sure the file query matches EXACTLY what student wants. If student asks for "ملخص" (summary), send ONLY summary files, NOT assignments or other files!
 - **CRITICAL**: Double-check the file name before sending to ensure it matches student's request!
+- **CRITICAL**: NEVER output JSON or technical data in your text responses - always speak naturally in Egyptian Arabic
 - If student requests multiple files, send them one after another using the tools
 - If file is an image (jpg, png), use send_file with type specification
 - If text file (.txt), read it and tell student the content in a friendly way
@@ -231,8 +242,9 @@ ${filesList}
 - When presenting search results, speak naturally in Egyptian dialect without mentioning you searched the internet
 - Always speak in natural Egyptian colloquial Arabic
 - If you're not sure about the exact file, ask student to clarify before sending!
+- **Reduce memory usage**: Keep responses concise to avoid token exhaustion
 
-Remember: You are a smart AI Agent - be accurate and careful with file sending!`;
+Remember: You are a smart AI Agent - be accurate, careful with file sending, and ALWAYS respond in natural Egyptian Arabic, NEVER in JSON or technical format!`;
 }
 
 /**
@@ -528,6 +540,63 @@ function findFileInConfig(query) {
 }
 
 /**
+ * الحصول على جميع الملفات من مجلد معين
+ */
+function getAllFilesFromFolder(folderPath) {
+    try {
+        const materialsPath = path.join(__dirname, '..', 'Materials');
+        const fullPath = path.join(materialsPath, folderPath);
+        
+        if (!fs.existsSync(fullPath)) {
+            return { success: false, files: [], message: `المجلد ${folderPath} غير موجود` };
+        }
+        
+        const stats = fs.statSync(fullPath);
+        if (!stats.isDirectory()) {
+            return { success: false, files: [], message: `${folderPath} ليس مجلد` };
+        }
+        
+        const files = [];
+        const items = fs.readdirSync(fullPath);
+        
+        for (const item of items) {
+            const itemPath = path.join(fullPath, item);
+            const itemStats = fs.statSync(itemPath);
+            
+            if (itemStats.isFile()) {
+                const fileExt = path.extname(item).toLowerCase();
+                let fileType = 'document';
+                
+                if (['.jpg', '.jpeg', '.png', '.gif', '.webp'].includes(fileExt)) {
+                    fileType = 'image';
+                } else if (['.mp4', '.avi', '.mov', '.mkv'].includes(fileExt)) {
+                    fileType = 'video';
+                } else if (['.mp3', '.wav', '.ogg', '.m4a'].includes(fileExt)) {
+                    fileType = 'audio';
+                } else if (['.txt', '.md'].includes(fileExt)) {
+                    fileType = 'text';
+                }
+                
+                files.push({
+                    keywords: [item],
+                    type: fileType === 'image' ? 'image' : 'file',
+                    filePath: itemPath,
+                    fileName: item,
+                    fileType: fileType,
+                    extension: fileExt,
+                    caption: `📚 ${item}`
+                });
+            }
+        }
+        
+        return { success: true, files: files, count: files.length };
+    } catch (error) {
+        console.error('خطأ في الحصول على ملفات المجلد:', error.message);
+        return { success: false, files: [], message: error.message };
+    }
+}
+
+/**
  * تعريف الأدوات (Tools) المتاحة للبوت
  */
 const tools = [
@@ -553,6 +622,27 @@ const tools = [
                     }
                 },
                 required: ["query", "reason"]
+            }
+        }
+    },
+    {
+        type: "function",
+        function: {
+            name: "send_folder",
+            description: "إرسال جميع الملفات من مجلد معين للطالب. استخدمها عندما يطلب الطالب كل محتوى مجلد معين (مثل: كل ملخصات المحاسبة، جميع محاضرات الاقتصاد). هذه الطريقة موفرة للتوكينز بدلاً من إرسال الملفات واحد واحد",
+            parameters: {
+                type: "object",
+                properties: {
+                    folderPath: {
+                        type: "string",
+                        description: "مسار المجلد نسبة للمجلد Materials (مثل: accounting/Summary, accounting/Lectures, economics/Summary)"
+                    },
+                    reason: {
+                        type: "string",
+                        description: "رسالة ودية بالمصري للطالب (مثل: تمام! اهو كل الملخصات)"
+                    }
+                },
+                required: ["folderPath", "reason"]
             }
         }
     },
@@ -588,6 +678,27 @@ const tools = [
                     }
                 },
                 required: []
+            }
+        }
+    },
+    {
+        type: "function",
+        function: {
+            name: "fetch_and_summarize",
+            description: "جلب محتوى مقالة أو صفحة ويب وتلخيصها. استخدمها عندما يطلب الطالب تلخيص مقالة أو موضوع معين. يدعم الترجمة من الإنجليزية للعربية",
+            parameters: {
+                type: "object",
+                properties: {
+                    query: {
+                        type: "string",
+                        description: "موضوع البحث أو عنوان المقالة (بالعربية أو الإنجليزية)"
+                    },
+                    translate: {
+                        type: "boolean",
+                        description: "true إذا كان المحتوى بالإنجليزية ويحتاج ترجمة للعربية"
+                    }
+                },
+                required: ["query"]
             }
         }
     },
@@ -635,6 +746,22 @@ async function executeTool(toolName, toolArgs) {
             return {
                 success: false,
                 message: "مالقيتش الملف ده في المواد المتاحة"
+            };
+        }
+    } else if (toolName === "send_folder") {
+        const folderResult = getAllFilesFromFolder(toolArgs.folderPath);
+        if (folderResult.success && folderResult.files.length > 0) {
+            return {
+                success: true,
+                action: "send_folder",
+                files: folderResult.files,
+                message: toolArgs.reason,
+                count: folderResult.count
+            };
+        } else {
+            return {
+                success: false,
+                message: folderResult.message || "مالقيتش ملفات في المجلد ده"
             };
         }
     } else if (toolName === "read_text_file") {
@@ -737,6 +864,45 @@ async function executeTool(toolName, toolArgs) {
                 message: "معلش، مالقيتش معلومات كافية عن الموضوع ده على النت"
             };
         }
+    } else if (toolName === "fetch_and_summarize") {
+        // جلب محتوى المقالة وتلخيصها
+        const searchResults = await webSearch(toolArgs.query);
+        
+        if (searchResults.found) {
+            let content = '';
+            
+            if (searchResults.abstract) {
+                content = searchResults.abstract;
+            } else if (searchResults.answer) {
+                content = searchResults.answer;
+            } else if (searchResults.definition) {
+                content = searchResults.definition;
+            } else if (searchResults.relatedTopics.length > 0) {
+                content = searchResults.relatedTopics.join('\n');
+            }
+            
+            if (content) {
+                // استخدام AI لتلخيص وترجمة المحتوى إذا لزم الأمر
+                const needsTranslation = toolArgs.translate || false;
+                const summaryPrompt = needsTranslation
+                    ? `لخص النص التالي بالعربية (ترجمه إذا كان بالإنجليزية):\n\n${content.substring(0, 2000)}`
+                    : `لخص النص التالي بشكل مختصر:\n\n${content.substring(0, 2000)}`;
+                
+                return {
+                    success: true,
+                    action: "article_summary",
+                    content: content.substring(0, 2000),
+                    needsSummary: true,
+                    summaryPrompt: summaryPrompt,
+                    message: `لقيت معلومات عن "${toolArgs.query}"`
+                };
+            }
+        }
+        
+        return {
+            success: false,
+            message: `معلش، مالقيتش محتوى كافي عن "${toolArgs.query}"`
+        };
     }
     
     return { success: false, message: "أداة غير معروفة" };
@@ -779,8 +945,8 @@ export async function processWithGroqAI(userMessage, userId, userName = "الط�
             messages: messages,
             tools: tools,
             tool_choice: "auto",
-            temperature: 0.7,
-            max_tokens: 1024
+            temperature: 0.5, // تقليل للحد من الهلوسة
+            max_tokens: 800 // تقليل لتوفير التوكينز
         });
         
         let assistantMessage = response.choices[0].message;
@@ -821,6 +987,12 @@ export async function processWithGroqAI(userMessage, userId, userName = "الط�
                         finalResponse.action = "send_file";
                         finalResponse.fileInfo = toolResult.fileInfo;
                     }
+                } else if (toolResult.success && toolResult.action === "send_folder") {
+                    // إضافة جميع ملفات المجلد لقائمة الملفات المراد إرسالها
+                    finalResponse.filesToSend.push(...toolResult.files);
+                    if (!finalResponse.action) {
+                        finalResponse.action = "send_folder";
+                    }
                 } else if (toolResult.success && toolResult.action === "text_content") {
                     // إذا كان ملف نصي، أضف المحتوى للسياق
                     finalResponse.textFileContent = toolResult.content;
@@ -831,8 +1003,8 @@ export async function processWithGroqAI(userMessage, userId, userName = "الط�
             response = await groq.chat.completions.create({
                 model: "llama-3.3-70b-versatile", // النموذج المحدث
                 messages: messages,
-                temperature: 0.7,
-                max_tokens: 1024
+                temperature: 0.5, // تقليل للحد من الهلوسة
+                max_tokens: 800 // تقليل لتوفير التوكينز
             });
             
             assistantMessage = response.choices[0].message;
