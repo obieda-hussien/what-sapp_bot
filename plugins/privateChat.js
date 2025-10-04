@@ -180,6 +180,7 @@ export function setPrivateChatStatus(enabled) {
     if (!config.privateChatResponses) {
         config.privateChatResponses = {
             enabled,
+            aiEnabled: true,
             keywords: []
         };
     } else {
@@ -187,4 +188,31 @@ export function setPrivateChatStatus(enabled) {
     }
     
     return saveConfig(config);
+}
+
+/**
+ * تفعيل/تعطيل AI فقط
+ */
+export function setAIStatus(enabled) {
+    const config = loadConfig();
+    
+    if (!config.privateChatResponses) {
+        config.privateChatResponses = { enabled: false, aiEnabled: true, keywords: [] };
+    }
+    
+    config.privateChatResponses.aiEnabled = enabled;
+    return saveConfig(config);
+}
+
+/**
+ * الحصول على حالة AI
+ */
+export function isAIEnabled() {
+    const config = loadConfig();
+    
+    if (!config.privateChatResponses) {
+        return true; // AI enabled by default
+    }
+    
+    return config.privateChatResponses.aiEnabled !== false;
 }

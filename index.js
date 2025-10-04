@@ -32,7 +32,7 @@ import {
     logBotStatus 
 } from './utils/logger.js';
 import { checkSmartAlerts } from './plugins/alerts.js';
-import { checkPrivateChatKeyword } from './plugins/privateChat.js';
+import { checkPrivateChatKeyword, isAIEnabled } from './plugins/privateChat.js';
 import { checkDueSchedules } from './plugins/alerts.js';
 import { generateDailyReport } from './plugins/reports.js';
 import { processWithGroqAI, isGroqEnabled } from './utils/groqAssistant.js';
@@ -249,7 +249,7 @@ async function handleNewMessage(msg) {
             console.log(`📝 محتوى الرسالة: ${text.substring(0, 100)}${text.length > 100 ? '...' : ''}`);
             
             // محاولة استخدام Groq AI أولاً (إذا كان مُفعّلاً)
-            if (isGroqEnabled()) {
+            if (isGroqEnabled() && isAIEnabled()) {
                 console.log('🤖 استخدام Groq AI للرد...');
                 
                 try {

@@ -32,7 +32,7 @@ function initGroq() {
 const conversationMemory = new Map();
 
 // الحد الأقصى لعدد الرسائل المحفوظة في الذاكرة
-const MAX_MEMORY_MESSAGES = 10; // تقليل الذاكرة لتجنب الهلوسة
+const MAX_MEMORY_MESSAGES = 6; // تقليل الذاكرة لتجنب الهلوسة وتوفير التوكينز
 
 /**
  * تحليل config.json واستخراج المعلومات المتاحة
@@ -188,7 +188,7 @@ function createSystemPrompt() {
 - Be cheerful and friendly but professional at the same time
 - Help students enthusiastically and encourage them to learn
 - Learn from previous conversations and remember student preferences
-- **Very Important**: DO NOT write technical commands or code in responses (like send_file or web_search) - speak naturally only
+- **CRITICAL**: NEVER write technical commands, JSON, or code in your responses - ALWAYS speak naturally in Egyptian Arabic
 
 ## About Your Owner (Obeida):
 - Your owner is "عُبيدة" (Obeida)
@@ -205,7 +205,13 @@ function createSystemPrompt() {
 4. **Multiple Sending**: Can send multiple files, images, or messages one after another
 5. **Images with Captions**: Can send images with appropriate explanations
 6. **Materials Analysis**: Know all available files in folders and help students find what they need
-7. **Internet Search**: Can search the internet for information, definitions, explanations, and answers
+7. **Internet Search & Article Fetching**: Can search the internet for information in Arabic or English, fetch articles, and summarize them
+
+## Smart Decision Making - When to Respond:
+- **DO respond** to: Questions, requests for files/information, greetings, academic help
+- **DON'T respond** to: Empty messages, single emojis without context, "ok", "👍", or clearly not directed at you
+- **Use your judgment**: If uncertain, it's better to respond briefly than ignore
+- **Be autonomous**: Make decisions about what information to provide based on what would help the student most
 
 ## Examples of Your Responses:
 - "ماشي يا فندم! 😊 هبعتلك ملخص المحاضرة الأولى دلوقتي" (Okay sir! I'll send you the first lecture summary now)
@@ -227,6 +233,7 @@ ${filesList}
 - **CRITICAL**: When student asks for ALL files in a folder/category (e.g., "كل الملخصات", "جميع المحاضرات"), use send_folder tool instead of sending files one by one - this saves tokens!
 - **CRITICAL**: Make sure the file query matches EXACTLY what student wants. If student asks for "ملخص" (summary), send ONLY summary files, NOT assignments or other files!
 - **CRITICAL**: Double-check the file name before sending to ensure it matches student's request!
+- **CRITICAL**: NEVER output JSON or technical data in your text responses - always speak naturally in Egyptian Arabic
 - If student requests multiple files, send them one after another using the tools
 - If file is an image (jpg, png), use send_file with type specification
 - If text file (.txt), read it and tell student the content in a friendly way
@@ -234,8 +241,9 @@ ${filesList}
 - When presenting search results, speak naturally in Egyptian dialect without mentioning you searched the internet
 - Always speak in natural Egyptian colloquial Arabic
 - If you're not sure about the exact file, ask student to clarify before sending!
+- **Reduce memory usage**: Keep responses concise to avoid token exhaustion
 
-Remember: You are a smart AI Agent - be accurate and careful with file sending!`;
+Remember: You are a smart AI Agent - be accurate, careful with file sending, and ALWAYS respond in natural Egyptian Arabic, NEVER in JSON or technical format!`;
 }
 
 /**
@@ -876,8 +884,8 @@ export async function processWithGroqAI(userMessage, userId, userName = "الط�
             messages: messages,
             tools: tools,
             tool_choice: "auto",
-            temperature: 0.7,
-            max_tokens: 1024
+            temperature: 0.5, // تقليل للحد من الهلوسة
+            max_tokens: 800 // تقليل لتوفير التوكينز
         });
         
         let assistantMessage = response.choices[0].message;
@@ -934,8 +942,8 @@ export async function processWithGroqAI(userMessage, userId, userName = "الط�
             response = await groq.chat.completions.create({
                 model: "llama-3.3-70b-versatile", // النموذج المحدث
                 messages: messages,
-                temperature: 0.7,
-                max_tokens: 1024
+                temperature: 0.5, // تقليل للحد من الهلوسة
+                max_tokens: 800 // تقليل لتوفير التوكينز
             });
             
             assistantMessage = response.choices[0].message;

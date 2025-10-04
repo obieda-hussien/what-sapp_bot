@@ -202,6 +202,7 @@ function getDefaultConfig() {
         admins: [],
         privateChatResponses: {
             enabled: false,
+            aiEnabled: true,  // التحكم في تفعيل/تعطيل AI بشكل منفصل
             keywords: []
         }
     };

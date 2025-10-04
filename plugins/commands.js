@@ -42,7 +42,9 @@ import {
     addPrivateChatResponse,
     removePrivateChatResponse,
     listPrivateChatResponses,
-    setPrivateChatStatus
+    setPrivateChatStatus,
+    setAIStatus,
+    isAIEnabled
 } from './privateChat.js';
 
 import {
@@ -245,6 +247,18 @@ export async function handleCommand(msg, sock, telegramBot) {
             case 'تعطيل_ردود':
             case 'disable_responses':
                 return await handleDisablePrivateResponsesCommand();
+            
+            case 'تفعيل_ai':
+            case 'enable_ai':
+                return await handleEnableAICommand();
+            
+            case 'تعطيل_ai':
+            case 'disable_ai':
+                return await handleDisableAICommand();
+            
+            case 'حالة_ai':
+            case 'ai_status':
+                return await handleAIStatusCommandNew();
             
             // أوامر Groq AI
             case 'مسح_ذاكرة':
@@ -1072,7 +1086,55 @@ async function handleDisablePrivateResponsesCommand() {
     setPrivateChatStatus(false);
     return {
         handled: true,
-        response: '🔓 تم تعطيل الردود الآلية للمحادثات الخاصة\n\nلن يتم الرد على الرسائل الخاصة'
+        response: '🔴 تم تعطيل جميع الردود الآلية (شامل AI)\n\nلن يرد البوت على أي رسالة خاصة'
+    };
+}
+
+/**
+ * أمر تفعيل AI فقط
+ */
+async function handleEnableAICommand() {
+    setAIStatus(true);
+    return {
+        handled: true,
+        response: '🤖 تم تفعيل AI\n\nالبوت سيستخدم الذكاء الاصطناعي للرد على الرسائل'
+    };
+}
+
+/**
+ * أمر تعطيل AI فقط
+ */
+async function handleDisableAICommand() {
+    setAIStatus(false);
+    return {
+        handled: true,
+        response: '⏸️ تم تعطيل AI\n\nالبوت سيستخدم الردود العادية (الكلمات المفتاحية) فقط'
+    };
+}
+
+/**
+ * أمر حالة AI
+ */
+async function handleAIStatusCommandNew() {
+    const aiEnabled = isAIEnabled();
+    const config = loadConfig();
+    const responsesEnabled = config.privateChatResponses?.enabled || false;
+    
+    let message = '📊 *حالة نظام الردود*\n\n';
+    message += `🤖 الذكاء الاصطناعي (AI): ${aiEnabled ? '🟢 مُفعّل' : '🔴 معطل'}\n`;
+    message += `💬 الردود العادية: ${responsesEnabled ? '🟢 مُفعّلة' : '🔴 معطلة'}\n\n`;
+    
+    if (!responsesEnabled) {
+        message += 'ℹ️ جميع الردود معطلة حالياً';
+    } else if (aiEnabled) {
+        message += '✅ البوت يستخدم AI + الردود العادية';
+    } else {
+        message += '✅ البوت يستخدم الردود العادية فقط';
+    }
+    
+    return {
+        handled: true,
+        response: message
     };
 }
 
