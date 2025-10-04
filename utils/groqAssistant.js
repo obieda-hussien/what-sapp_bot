@@ -32,7 +32,7 @@ function initGroq() {
 const conversationMemory = new Map();
 
 // الحد الأقصى لعدد الرسائل المحفوظة في الذاكرة
-const MAX_MEMORY_MESSAGES = 20;
+const MAX_MEMORY_MESSAGES = 10; // تقليل الذاكرة لتجنب الهلوسة
 
 /**
  * تحليل config.json واستخراج المعلومات المتاحة
@@ -221,14 +221,18 @@ ${filesList}
 
 ## Important Guidelines:
 - Use tools to send files to students without mentioning the tool name to them
+- **CRITICAL**: Only use send_file tool when student EXPLICITLY requests a file. Do NOT send files unless asked!
+- **CRITICAL**: Make sure the file query matches EXACTLY what student wants. If student asks for "ملخص" (summary), send ONLY summary files, NOT assignments or other files!
+- **CRITICAL**: Double-check the file name before sending to ensure it matches student's request!
 - If student requests multiple files, send them one after another using the tools
 - If file is an image (jpg, png), use send_file with type specification
 - If text file (.txt), read it and tell student the content in a friendly way
 - If student asks about general knowledge, current events, or needs information not in files, use web_search tool
 - When presenting search results, speak naturally in Egyptian dialect without mentioning you searched the internet
 - Always speak in natural Egyptian colloquial Arabic
+- If you're not sure about the exact file, ask student to clarify before sending!
 
-Remember: You are a smart AI Agent that learns and evolves with every conversation!`;
+Remember: You are a smart AI Agent - be accurate and careful with file sending!`;
 }
 
 /**
@@ -246,7 +250,15 @@ function getConversationContext(userId) {
  */
 function addToMemory(userId, role, content) {
     const context = getConversationContext(userId);
-    context.push({ role, content });
+    
+    // تقصير المحتوى إذا كان طويلاً جداً لتجنب الهلوسة
+    const maxContentLength = 500;
+    let finalContent = content;
+    if (typeof content === 'string' && content.length > maxContentLength) {
+        finalContent = content.substring(0, maxContentLength) + '...';
+    }
+    
+    context.push({ role, content: finalContent });
     
     // الحفاظ على آخر MAX_MEMORY_MESSAGES رسالة فقط
     if (context.length > MAX_MEMORY_MESSAGES) {
@@ -412,53 +424,104 @@ function listAllMaterials() {
 }
 
 /**
- * البحث عن ملف في config.json أو Materials
+ * البحث عن ملف في config.json أو Materials بدقة عالية
  */
 function findFileInConfig(query) {
-    // أولاً: البحث في config.json
+    const queryLower = query.toLowerCase();
+    
+    // أولاً: البحث في config.json بدقة
     const config = loadConfig();
     
     if (config.privateChatResponses && config.privateChatResponses.keywords) {
-        const queryLower = query.toLowerCase();
+        let bestMatch = null;
+        let bestMatchScore = 0;
         
         for (const item of config.privateChatResponses.keywords) {
             const keywords = Array.isArray(item.keywords) ? item.keywords : [item.keywords];
             
-            // البحث في الكلمات المفتاحية
+            // حساب درجة التطابق
             for (const keyword of keywords) {
-                if (queryLower.includes(keyword.toLowerCase()) || 
-                    keyword.toLowerCase().includes(queryLower)) {
-                    return {
+                const keywordLower = keyword.toLowerCase();
+                let score = 0;
+                
+                // تطابق دقيق - أعلى درجة
+                if (queryLower === keywordLower) {
+                    score = 100;
+                }
+                // يحتوي على الكلمة كاملة
+                else if (queryLower.includes(keywordLower) && keywordLower.length > 3) {
+                    score = 80;
+                }
+                // الكلمة تحتوي على الاستعلام
+                else if (keywordLower.includes(queryLower) && queryLower.length > 3) {
+                    score = 60;
+                }
+                
+                // تحديث أفضل تطابق
+                if (score > bestMatchScore) {
+                    bestMatchScore = score;
+                    bestMatch = {
                         keywords: keywords,
                         type: item.responseType,
                         text: item.text,
                         filePath: item.filePath,
                         caption: item.caption,
-                        source: 'config'
+                        source: 'config',
+                        score: score
                     };
                 }
             }
         }
+        
+        // إرجاع فقط إذا كانت الدرجة عالية بما يكفي
+        if (bestMatchScore >= 60) {
+            return bestMatch;
+        }
     }
     
-    // ثانياً: البحث المباشر في مجلد Materials
+    // ثانياً: البحث المباشر في مجلد Materials بدقة عالية
     const materialsResults = searchMaterialsFolder(query);
     
     if (materialsResults.length > 0) {
-        // إرجاع أول نتيجة مطابقة
-        const bestMatch = materialsResults[0];
-        return {
-            keywords: [query],
-            type: bestMatch.fileType === 'image' ? 'image' : 'file',
-            text: null,
-            filePath: bestMatch.fullPath,
-            caption: `📚 ${bestMatch.fileName}`,
-            source: 'materials',
-            fileName: bestMatch.fileName,
-            category: bestMatch.category,
-            fileType: bestMatch.fileType,
-            extension: bestMatch.extension
-        };
+        // فلترة النتائج بناءً على دقة التطابق
+        const filteredResults = materialsResults.filter(result => {
+            const fileNameLower = result.fileName.toLowerCase();
+            const queryWords = queryLower.split(/\s+/);
+            
+            // التأكد من تطابق الكلمات المهمة
+            // مثلاً: إذا طلب "ملخص" يجب أن يحتوي اسم الملف على "ملخص"
+            const keyWords = ['ملخص', 'محاضر', 'اسايمنت', 'تكليف', 'summary', 'lecture', 'assignment'];
+            const requestedType = keyWords.find(kw => queryLower.includes(kw));
+            
+            if (requestedType) {
+                // التأكد من تطابق النوع
+                return fileNameLower.includes(requestedType);
+            }
+            
+            // تطابق عام - يجب أن تتطابق معظم الكلمات
+            const matchedWords = queryWords.filter(word => 
+                word.length > 2 && fileNameLower.includes(word)
+            );
+            
+            return matchedWords.length >= Math.floor(queryWords.length / 2);
+        });
+        
+        if (filteredResults.length > 0) {
+            // إرجاع أفضل نتيجة
+            const bestMatch = filteredResults[0];
+            return {
+                keywords: [query],
+                type: bestMatch.fileType === 'image' ? 'image' : 'file',
+                text: null,
+                filePath: bestMatch.fullPath,
+                caption: `📚 ${bestMatch.fileName}`,
+                source: 'materials',
+                fileName: bestMatch.fileName,
+                category: bestMatch.category,
+                fileType: bestMatch.fileType,
+                extension: bestMatch.extension
+            };
+        }
     }
     
     return null;
