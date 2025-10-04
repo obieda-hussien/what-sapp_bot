@@ -8,6 +8,7 @@ import { loadConfig } from '../utils/config.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import axios from 'axios';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -95,6 +96,72 @@ function readTextFile(filePath) {
 }
 
 /**
+ * البحث في الإنترنت باستخدام DuckDuckGo API (مجاني بدون API key)
+ */
+async function webSearch(query) {
+    try {
+        console.log(`🔍 بحث في الإنترنت عن: ${query}`);
+        
+        // استخدام DuckDuckGo Instant Answer API (مجاني 100%)
+        const response = await axios.get('https://api.duckduckgo.com/', {
+            params: {
+                q: query,
+                format: 'json',
+                no_html: 1,
+                skip_disambig: 1
+            },
+            timeout: 10000
+        });
+        
+        const data = response.data;
+        let results = {
+            found: false,
+            abstract: '',
+            relatedTopics: [],
+            answer: '',
+            definition: ''
+        };
+        
+        // استخراج الإجابة المباشرة
+        if (data.Answer) {
+            results.answer = data.Answer;
+            results.found = true;
+        }
+        
+        // استخراج التعريف
+        if (data.Definition) {
+            results.definition = data.Definition;
+            results.found = true;
+        }
+        
+        // استخراج الملخص
+        if (data.Abstract) {
+            results.abstract = data.Abstract;
+            results.found = true;
+        }
+        
+        // استخراج المواضيع ذات الصلة
+        if (data.RelatedTopics && data.RelatedTopics.length > 0) {
+            results.relatedTopics = data.RelatedTopics
+                .filter(topic => topic.Text)
+                .slice(0, 5)
+                .map(topic => topic.Text);
+            if (results.relatedTopics.length > 0) {
+                results.found = true;
+            }
+        }
+        
+        return results;
+    } catch (error) {
+        console.error('❌ خطأ في البحث عبر الإنترنت:', error.message);
+        return {
+            found: false,
+            error: error.message
+        };
+    }
+}
+
+/**
  * إنشاء System Prompt للبوت
  */
 function createSystemPrompt() {
@@ -121,7 +188,7 @@ function createSystemPrompt() {
 - Be cheerful and friendly but professional at the same time
 - Help students enthusiastically and encourage them to learn
 - Learn from previous conversations and remember student preferences
-- **Very Important**: DO NOT write technical commands or code in responses (like send_file or analyze_config) - speak naturally only
+- **Very Important**: DO NOT write technical commands or code in responses (like send_file or web_search) - speak naturally only
 
 ## About Your Owner (Obeida):
 - Your owner is "عُبيدة" (Obeida)
@@ -137,6 +204,7 @@ function createSystemPrompt() {
 3. **Multiple Sending**: Can send multiple files, images, or messages one after another
 4. **Images with Captions**: Can send images with appropriate explanations
 5. **Materials Analysis**: Know all available files in folders and help students find what they need
+6. **Internet Search**: Can search the internet for information, definitions, explanations, and answers
 
 ## Examples of Your Responses:
 - "ماشي يا فندم! 😊 هبعتلك ملخص المحاضرة الأولى دلوقتي" (Okay sir! I'll send you the first lecture summary now)
@@ -145,6 +213,7 @@ function createSystemPrompt() {
 - "يلا بينا نشوف عندك إيه 👀" (Let's see what we have)
 - "طب استنى شوية هجيبلك الحاجات دي" (Wait a bit, I'll get you these things)
 - "اومال! عندي كل حاجة والحمد لله 🎓" (Of course! I have everything, thank God)
+- "هدور على الموضوع ده على النت وأجيبلك المعلومات 🔍" (I'll search for this topic on the internet and get you the information)
 
 ## Available Resources in Materials Folder:
 - **Total Files**: ${materialsData.total} files
@@ -155,6 +224,8 @@ ${filesList}
 - If student requests multiple files, send them one after another using the tools
 - If file is an image (jpg, png), use send_file with type specification
 - If text file (.txt), read it and tell student the content in a friendly way
+- If student asks about general knowledge, current events, or needs information not in files, use web_search tool
+- When presenting search results, speak naturally in Egyptian dialect without mentioning you searched the internet
 - Always speak in natural Egyptian colloquial Arabic
 
 Remember: You are a smart AI Agent that learns and evolves with every conversation!`;
@@ -456,6 +527,23 @@ const tools = [
                 required: []
             }
         }
+    },
+    {
+        type: "function",
+        function: {
+            name: "web_search",
+            description: "البحث في الإنترنت عن معلومات، تعريفات، شروحات، أو إجابات. استخدمها عندما يسأل الطالب عن معلومات عامة أو أحداث جارية أو مواضيع غير موجودة في الملفات",
+            parameters: {
+                type: "object",
+                properties: {
+                    query: {
+                        type: "string",
+                        description: "استعلام البحث (بالعربية أو الإنجليزية)"
+                    }
+                },
+                required: ["query"]
+            }
+        }
     }
 ];
 
@@ -556,6 +644,34 @@ async function executeTool(toolName, toolArgs) {
                 success: true,
                 data: catData,
                 summary: `لدي ${catData.length} ملف في ${category}`
+            };
+        }
+    } else if (toolName === "web_search") {
+        const searchResults = await webSearch(toolArgs.query);
+        
+        if (searchResults.found) {
+            let summary = '';
+            
+            if (searchResults.answer) {
+                summary = `✅ ${searchResults.answer}`;
+            } else if (searchResults.definition) {
+                summary = `📖 ${searchResults.definition}`;
+            } else if (searchResults.abstract) {
+                summary = `📝 ${searchResults.abstract}`;
+            } else if (searchResults.relatedTopics.length > 0) {
+                summary = `📌 معلومات ذات صلة:\n${searchResults.relatedTopics.join('\n')}`;
+            }
+            
+            return {
+                success: true,
+                action: "web_search_result",
+                results: searchResults,
+                summary: summary
+            };
+        } else {
+            return {
+                success: false,
+                message: "معلش، مالقيتش معلومات كافية عن الموضوع ده على النت"
             };
         }
     }
