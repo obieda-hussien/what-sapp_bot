@@ -246,6 +246,8 @@ async function handleNewMessage(msg) {
         
         const text = messageContent.text || messageContent;
         if (typeof text === 'string') {
+            console.log(`📝 محتوى الرسالة: ${text.substring(0, 100)}${text.length > 100 ? '...' : ''}`);
+            
             // محاولة استخدام Groq AI أولاً (إذا كان مُفعّلاً)
             if (isGroqEnabled()) {
                 console.log('🤖 استخدام Groq AI للرد...');
@@ -341,10 +343,13 @@ async function handleNewMessage(msg) {
                     console.error('❌ خطأ في Groq AI:', error.message);
                     console.log('⚠️ التراجع للنظام العادي');
                 }
+            } else {
+                console.log('ℹ️ Groq AI غير مُفعّل أو غير متاح');
             }
             
             // النظام العادي (في حال عدم تفعيل Groq أو فشله)
             const response = checkPrivateChatKeyword(text);
+            console.log(`🔍 نتيجة البحث: ${response ? 'تم العثور على رد' : 'لم يتم العثور على رد'}`);
             
             if (response) {
                 console.log(`🔍 تم العثور على كلمة مفتاحية: ${response.keyword}`);
@@ -420,8 +425,11 @@ async function handleNewMessage(msg) {
                     console.error('❌ خطأ في إرسال الرد:', error.message);
                 }
             } else {
-                console.log('ℹ️ لم يتم العثور على كلمة مفتاحية - لن يتم الرد');
+                console.log('ℹ️ لم يتم العثور على كلمة مفتاحية - سيتم تجاهل الرسالة');
+                console.log('💡 تلميح: تأكد من تفعيل الردود (.تفعيل_ردود) أو إضافة ردود جديدة (.اضافة_رد)');
             }
+        } else {
+            console.log('⚠️ الرسالة ليست نصية');
         }
         return; // لا نقوم بنقل المحادثات الخاصة إلى Telegram
     }
