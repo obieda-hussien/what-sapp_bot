@@ -501,17 +501,25 @@ async function handleAddEliteCommand(args) {
     if (args.length < 1) {
         return {
             handled: true,
-            response: '❌ الاستخدام الصحيح:\n.اضافة_نخبة <رقم_الهاتف>\n\nمثال:\n.اضافة_نخبة 201234567890'
+            response: '❌ الاستخدام الصحيح:\n.اضافة_نخبة <رقم_الهاتف أو LID>\n\nأمثلة:\n.اضافة_نخبة 201234567890\n.اضافة_نخبة 225060749086880:22@lid'
         };
     }
     
-    const phoneNumber = args[0].replace(/\D/g, ''); // إزالة أي شيء غير الأرقام
-    const success = addEliteUser(phoneNumber);
+    const identifier = args[0].trim(); // رقم الهاتف أو LID
+    
+    // إذا كان LID (يحتوي على : و @lid)
+    const isLid = identifier.includes(':') && identifier.includes('@lid');
+    
+    // إذا لم يكن LID، نزيل الأرقام فقط
+    const cleanIdentifier = isLid ? identifier : identifier.replace(/\D/g, '');
+    
+    const success = addEliteUser(cleanIdentifier);
     
     if (success) {
+        const identifierType = isLid ? 'LID' : 'رقم الهاتف';
         return {
             handled: true,
-            response: `✅ تم إضافة المستخدم للنخبة بنجاح!\n\n📱 الرقم: ${phoneNumber}`
+            response: `✅ تم إضافة المستخدم للنخبة بنجاح!\n\n📱 ${identifierType}: ${cleanIdentifier}`
         };
     } else {
         return {
@@ -528,17 +536,25 @@ async function handleRemoveEliteCommand(args) {
     if (args.length < 1) {
         return {
             handled: true,
-            response: '❌ الاستخدام الصحيح:\n.حذف_نخبة <رقم_الهاتف>\n\nمثال:\n.حذف_نخبة 201234567890'
+            response: '❌ الاستخدام الصحيح:\n.حذف_نخبة <رقم_الهاتف أو LID>\n\nأمثلة:\n.حذف_نخبة 201234567890\n.حذف_نخبة 225060749086880:22@lid'
         };
     }
     
-    const phoneNumber = args[0].replace(/\D/g, '');
-    const success = removeEliteUser(phoneNumber);
+    const identifier = args[0].trim(); // رقم الهاتف أو LID
+    
+    // إذا كان LID (يحتوي على : و @lid)
+    const isLid = identifier.includes(':') && identifier.includes('@lid');
+    
+    // إذا لم يكن LID، نزيل الأرقام فقط
+    const cleanIdentifier = isLid ? identifier : identifier.replace(/\D/g, '');
+    
+    const success = removeEliteUser(cleanIdentifier);
     
     if (success) {
+        const identifierType = isLid ? 'LID' : 'رقم الهاتف';
         return {
             handled: true,
-            response: `✅ تم حذف المستخدم من النخبة بنجاح!\n\n📱 الرقم: ${phoneNumber}`
+            response: `✅ تم حذف المستخدم من النخبة بنجاح!\n\n📱 ${identifierType}: ${cleanIdentifier}`
         };
     } else {
         return {
