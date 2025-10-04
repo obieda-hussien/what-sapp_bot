@@ -293,6 +293,69 @@ async function handleNewMessage(msg) {
                                 text: '❌ عذراً، الملف المطلوب غير متوفر حالياً' 
                             });
                         }
+                    } else if (keywordResponse.responseType === 'document' && keywordResponse.filePath) {
+                        const fs = await import('fs');
+                        const path = await import('path');
+                        if (fs.existsSync(keywordResponse.filePath)) {
+                            // تحديد نوع الملف من الامتداد
+                            const fileExt = path.extname(keywordResponse.filePath).toLowerCase();
+                            const isImage = ['.jpg', '.jpeg', '.png', '.gif', '.webp'].includes(fileExt);
+                            
+                            if (isImage) {
+                                await sock.sendMessage(groupJid, {
+                                    image: { url: keywordResponse.filePath },
+                                    caption: keywordResponse.caption || ''
+                                });
+                                console.log('✅ تم إرسال صورة (document)');
+                            } else {
+                                await sock.sendMessage(groupJid, {
+                                    document: { url: keywordResponse.filePath },
+                                    mimetype: fileExt === '.pdf' ? 'application/pdf' : 'application/octet-stream',
+                                    fileName: path.basename(keywordResponse.filePath),
+                                    caption: keywordResponse.caption || ''
+                                });
+                                console.log('✅ تم إرسال مستند (document)');
+                            }
+                        } else {
+                            console.log(`❌ الملف غير موجود: ${keywordResponse.filePath}`);
+                            await sock.sendMessage(groupJid, { 
+                                text: '❌ عذراً، الملف المطلوب غير متوفر حالياً' 
+                            });
+                        }
+                    } else if (keywordResponse.responseType === 'both' && keywordResponse.text && keywordResponse.filePath) {
+                        const fs = await import('fs');
+                        const path = await import('path');
+                        
+                        // إرسال النص أولاً
+                        await sock.sendMessage(groupJid, { text: keywordResponse.text });
+                        console.log('✅ تم إرسال النص (both)');
+                        
+                        // ثم إرسال الملف
+                        if (fs.existsSync(keywordResponse.filePath)) {
+                            const fileExt = path.extname(keywordResponse.filePath).toLowerCase();
+                            const isImage = ['.jpg', '.jpeg', '.png', '.gif', '.webp'].includes(fileExt);
+                            
+                            if (isImage) {
+                                await sock.sendMessage(groupJid, {
+                                    image: { url: keywordResponse.filePath },
+                                    caption: keywordResponse.caption || ''
+                                });
+                                console.log('✅ تم إرسال صورة (both)');
+                            } else {
+                                await sock.sendMessage(groupJid, {
+                                    document: { url: keywordResponse.filePath },
+                                    mimetype: fileExt === '.pdf' ? 'application/pdf' : 'application/octet-stream',
+                                    fileName: path.basename(keywordResponse.filePath),
+                                    caption: keywordResponse.caption || ''
+                                });
+                                console.log('✅ تم إرسال مستند (both)');
+                            }
+                        } else {
+                            console.log(`❌ الملف غير موجود: ${keywordResponse.filePath}`);
+                            await sock.sendMessage(groupJid, { 
+                                text: '⚠️ الملف المطلوب غير متوفر حالياً' 
+                            });
+                        }
                     }
                     return; // تم المعالجة بالردود الجاهزة
                 } catch (error) {
