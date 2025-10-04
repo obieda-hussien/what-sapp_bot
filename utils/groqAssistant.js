@@ -200,16 +200,18 @@ function createSystemPrompt() {
 
 ## Your Capabilities:
 1. **Send Files**: Can send PDF files, images (JPG/PNG), and text files
-2. **Read Text Files**: Can read content of text files (.txt) and explain them to students
-3. **Multiple Sending**: Can send multiple files, images, or messages one after another
-4. **Images with Captions**: Can send images with appropriate explanations
-5. **Materials Analysis**: Know all available files in folders and help students find what they need
-6. **Internet Search**: Can search the internet for information, definitions, explanations, and answers
+2. **Send Entire Folders**: Can send all files from a specific folder at once - this is TOKEN-EFFICIENT when students request all files from a category (like "كل ملخصات المحاسبة" or "جميع محاضرات الاقتصاد")
+3. **Read Text Files**: Can read content of text files (.txt) and explain them to students
+4. **Multiple Sending**: Can send multiple files, images, or messages one after another
+5. **Images with Captions**: Can send images with appropriate explanations
+6. **Materials Analysis**: Know all available files in folders and help students find what they need
+7. **Internet Search**: Can search the internet for information, definitions, explanations, and answers
 
 ## Examples of Your Responses:
 - "ماشي يا فندم! 😊 هبعتلك ملخص المحاضرة الأولى دلوقتي" (Okay sir! I'll send you the first lecture summary now)
 - "تمام! اهو الملف وصلك، ربنا يوفقك 📚" (Perfect! Here's the file, may God help you succeed)
 - "خلاص يا باشا! هبعتلك التكليف كله ورا بعض" (Alright boss! I'll send you all the assignments one after another)
+- "تمام! هبعتلك كل الملفات اللي في المجلد دي مرة واحدة 📂" (Perfect! I'll send you all files in this folder at once)
 - "يلا بينا نشوف عندك إيه 👀" (Let's see what we have)
 - "طب استنى شوية هجيبلك الحاجات دي" (Wait a bit, I'll get you these things)
 - "اومال! عندي كل حاجة والحمد لله 🎓" (Of course! I have everything, thank God)
@@ -222,6 +224,7 @@ ${filesList}
 ## Important Guidelines:
 - Use tools to send files to students without mentioning the tool name to them
 - **CRITICAL**: Only use send_file tool when student EXPLICITLY requests a file. Do NOT send files unless asked!
+- **CRITICAL**: When student asks for ALL files in a folder/category (e.g., "كل الملخصات", "جميع المحاضرات"), use send_folder tool instead of sending files one by one - this saves tokens!
 - **CRITICAL**: Make sure the file query matches EXACTLY what student wants. If student asks for "ملخص" (summary), send ONLY summary files, NOT assignments or other files!
 - **CRITICAL**: Double-check the file name before sending to ensure it matches student's request!
 - If student requests multiple files, send them one after another using the tools
@@ -528,6 +531,63 @@ function findFileInConfig(query) {
 }
 
 /**
+ * الحصول على جميع الملفات من مجلد معين
+ */
+function getAllFilesFromFolder(folderPath) {
+    try {
+        const materialsPath = path.join(__dirname, '..', 'Materials');
+        const fullPath = path.join(materialsPath, folderPath);
+        
+        if (!fs.existsSync(fullPath)) {
+            return { success: false, files: [], message: `المجلد ${folderPath} غير موجود` };
+        }
+        
+        const stats = fs.statSync(fullPath);
+        if (!stats.isDirectory()) {
+            return { success: false, files: [], message: `${folderPath} ليس مجلد` };
+        }
+        
+        const files = [];
+        const items = fs.readdirSync(fullPath);
+        
+        for (const item of items) {
+            const itemPath = path.join(fullPath, item);
+            const itemStats = fs.statSync(itemPath);
+            
+            if (itemStats.isFile()) {
+                const fileExt = path.extname(item).toLowerCase();
+                let fileType = 'document';
+                
+                if (['.jpg', '.jpeg', '.png', '.gif', '.webp'].includes(fileExt)) {
+                    fileType = 'image';
+                } else if (['.mp4', '.avi', '.mov', '.mkv'].includes(fileExt)) {
+                    fileType = 'video';
+                } else if (['.mp3', '.wav', '.ogg', '.m4a'].includes(fileExt)) {
+                    fileType = 'audio';
+                } else if (['.txt', '.md'].includes(fileExt)) {
+                    fileType = 'text';
+                }
+                
+                files.push({
+                    keywords: [item],
+                    type: fileType === 'image' ? 'image' : 'file',
+                    filePath: itemPath,
+                    fileName: item,
+                    fileType: fileType,
+                    extension: fileExt,
+                    caption: `📚 ${item}`
+                });
+            }
+        }
+        
+        return { success: true, files: files, count: files.length };
+    } catch (error) {
+        console.error('خطأ في الحصول على ملفات المجلد:', error.message);
+        return { success: false, files: [], message: error.message };
+    }
+}
+
+/**
  * تعريف الأدوات (Tools) المتاحة للبوت
  */
 const tools = [
@@ -553,6 +613,27 @@ const tools = [
                     }
                 },
                 required: ["query", "reason"]
+            }
+        }
+    },
+    {
+        type: "function",
+        function: {
+            name: "send_folder",
+            description: "إرسال جميع الملفات من مجلد معين للطالب. استخدمها عندما يطلب الطالب كل محتوى مجلد معين (مثل: كل ملخصات المحاسبة، جميع محاضرات الاقتصاد). هذه الطريقة موفرة للتوكينز بدلاً من إرسال الملفات واحد واحد",
+            parameters: {
+                type: "object",
+                properties: {
+                    folderPath: {
+                        type: "string",
+                        description: "مسار المجلد نسبة للمجلد Materials (مثل: accounting/Summary, accounting/Lectures, economics/Summary)"
+                    },
+                    reason: {
+                        type: "string",
+                        description: "رسالة ودية بالمصري للطالب (مثل: تمام! اهو كل الملخصات)"
+                    }
+                },
+                required: ["folderPath", "reason"]
             }
         }
     },
@@ -635,6 +716,22 @@ async function executeTool(toolName, toolArgs) {
             return {
                 success: false,
                 message: "مالقيتش الملف ده في المواد المتاحة"
+            };
+        }
+    } else if (toolName === "send_folder") {
+        const folderResult = getAllFilesFromFolder(toolArgs.folderPath);
+        if (folderResult.success && folderResult.files.length > 0) {
+            return {
+                success: true,
+                action: "send_folder",
+                files: folderResult.files,
+                message: toolArgs.reason,
+                count: folderResult.count
+            };
+        } else {
+            return {
+                success: false,
+                message: folderResult.message || "مالقيتش ملفات في المجلد ده"
             };
         }
     } else if (toolName === "read_text_file") {
@@ -820,6 +917,12 @@ export async function processWithGroqAI(userMessage, userId, userName = "الط�
                     if (!finalResponse.action) {
                         finalResponse.action = "send_file";
                         finalResponse.fileInfo = toolResult.fileInfo;
+                    }
+                } else if (toolResult.success && toolResult.action === "send_folder") {
+                    // إضافة جميع ملفات المجلد لقائمة الملفات المراد إرسالها
+                    finalResponse.filesToSend.push(...toolResult.files);
+                    if (!finalResponse.action) {
+                        finalResponse.action = "send_folder";
                     }
                 } else if (toolResult.success && toolResult.action === "text_content") {
                     // إذا كان ملف نصي، أضف المحتوى للسياق
