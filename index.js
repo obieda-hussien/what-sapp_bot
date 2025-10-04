@@ -248,9 +248,62 @@ async function handleNewMessage(msg) {
         if (typeof text === 'string') {
             console.log(`📝 محتوى الرسالة: ${text.substring(0, 100)}${text.length > 100 ? '...' : ''}`);
             
-            // محاولة استخدام Groq AI أولاً (إذا كان مُفعّلاً)
+            // 🎯 التحقق من الكلمات المفتاحية أولاً (توفير التوكينز)
+            // إذا وُجد رد جاهز، لا حاجة لاستخدام AI
+            const keywordResponse = checkPrivateChatKeyword(text);
+            
+            if (keywordResponse) {
+                console.log(`🔍 تم العثور على كلمة مفتاحية: ${keywordResponse.keyword}`);
+                console.log(`📝 نوع الرد: ${keywordResponse.responseType}`);
+                console.log(`💡 توفير التوكينز: تم الرد بدون استخدام AI`);
+                
+                try {
+                    // إرسال الرد حسب النوع
+                    if (keywordResponse.responseType === 'text' && keywordResponse.text) {
+                        await sock.sendMessage(groupJid, { text: keywordResponse.text });
+                        console.log('✅ تم إرسال رد نصي');
+                    } else if (keywordResponse.responseType === 'image' && keywordResponse.filePath) {
+                        const fs = await import('fs');
+                        if (fs.existsSync(keywordResponse.filePath)) {
+                            await sock.sendMessage(groupJid, {
+                                image: { url: keywordResponse.filePath },
+                                caption: keywordResponse.caption || ''
+                            });
+                            console.log('✅ تم إرسال صورة');
+                        } else {
+                            console.log(`❌ الملف غير موجود: ${keywordResponse.filePath}`);
+                            await sock.sendMessage(groupJid, { 
+                                text: '❌ عذراً، الملف المطلوب غير متوفر حالياً' 
+                            });
+                        }
+                    } else if (keywordResponse.responseType === 'file' && keywordResponse.filePath) {
+                        const fs = await import('fs');
+                        const path = await import('path');
+                        if (fs.existsSync(keywordResponse.filePath)) {
+                            await sock.sendMessage(groupJid, {
+                                document: { url: keywordResponse.filePath },
+                                mimetype: 'application/pdf',
+                                fileName: path.basename(keywordResponse.filePath),
+                                caption: keywordResponse.caption || ''
+                            });
+                            console.log('✅ تم إرسال ملف');
+                        } else {
+                            console.log(`❌ الملف غير موجود: ${keywordResponse.filePath}`);
+                            await sock.sendMessage(groupJid, { 
+                                text: '❌ عذراً، الملف المطلوب غير متوفر حالياً' 
+                            });
+                        }
+                    }
+                    return; // تم المعالجة بالردود الجاهزة
+                } catch (error) {
+                    console.error('❌ خطأ في إرسال الرد الجاهز:', error.message);
+                    // سنحاول AI كخطة احتياطية
+                }
+            }
+            
+            // 🤖 استخدام Groq AI فقط إذا لم يتم العثور على رد جاهز (إذا كان مُفعّلاً)
             if (isGroqEnabled() && isAIEnabled()) {
-                console.log('🤖 استخدام Groq AI للرد...');
+                console.log('🤖 لم يتم العثور على رد جاهز، استخدام Groq AI...');
                 
                 try {
                     const groqResponse = await processWithGroqAI(text, senderPhone, senderName);
@@ -337,97 +390,17 @@ async function handleNewMessage(msg) {
                         
                         return; // تم المعالجة بنجاح
                     } else {
-                        console.log('⚠️ Groq AI فشل، التراجع للنظام العادي');
+                        console.log('⚠️ Groq AI فشل في الرد');
                     }
                 } catch (error) {
                     console.error('❌ خطأ في Groq AI:', error.message);
-                    console.log('⚠️ التراجع للنظام العادي');
                 }
             } else {
                 console.log('ℹ️ Groq AI غير مُفعّل أو غير متاح');
             }
             
-            // النظام العادي (في حال عدم تفعيل Groq أو فشله)
-            const response = checkPrivateChatKeyword(text);
-            console.log(`🔍 نتيجة البحث: ${response ? 'تم العثور على رد' : 'لم يتم العثور على رد'}`);
-            
-            if (response) {
-                console.log(`🔍 تم العثور على كلمة مفتاحية: ${response.keyword}`);
-                console.log(`📝 نوع الرد: ${response.responseType}`);
-                
-                try {
-                    // إرسال الرد حسب النوع
-                    if (response.responseType === 'text' && response.text) {
-                        await sock.sendMessage(groupJid, { text: response.text });
-                        console.log('✅ تم إرسال رد نصي');
-                    } else if (response.responseType === 'image' && response.filePath) {
-                        const fs = await import('fs');
-                        if (fs.existsSync(response.filePath)) {
-                            await sock.sendMessage(groupJid, {
-                                image: { url: response.filePath },
-                                caption: response.caption || ''
-                            });
-                            console.log('✅ تم إرسال صورة');
-                        } else {
-                            console.log(`❌ الملف غير موجود: ${response.filePath}`);
-                            await sock.sendMessage(groupJid, { 
-                                text: '❌ عذراً، الملف المطلوب غير متوفر حالياً' 
-                            });
-                        }
-                    } else if (response.responseType === 'document' && response.filePath) {
-                        const fs = await import('fs');
-                        if (fs.existsSync(response.filePath)) {
-                            const path = await import('path');
-                            await sock.sendMessage(groupJid, {
-                                document: { url: response.filePath },
-                                mimetype: 'application/pdf',
-                                fileName: path.basename(response.filePath),
-                                caption: response.caption || ''
-                            });
-                            console.log('✅ تم إرسال ملف PDF');
-                        } else {
-                            console.log(`❌ الملف غير موجود: ${response.filePath}`);
-                            await sock.sendMessage(groupJid, { 
-                                text: '❌ عذراً، الملف المطلوب غير متوفر حالياً' 
-                            });
-                        }
-                    } else if (response.responseType === 'both') {
-                        // إرسال النص أولاً
-                        if (response.text) {
-                            await sock.sendMessage(groupJid, { text: response.text });
-                        }
-                        // ثم إرسال الصورة/الملف
-                        if (response.filePath) {
-                            const fs = await import('fs');
-                            if (fs.existsSync(response.filePath)) {
-                                const ext = response.filePath.toLowerCase();
-                                if (ext.endsWith('.jpg') || ext.endsWith('.jpeg') || ext.endsWith('.png')) {
-                                    await sock.sendMessage(groupJid, {
-                                        image: { url: response.filePath },
-                                        caption: response.caption || ''
-                                    });
-                                } else {
-                                    const path = await import('path');
-                                    await sock.sendMessage(groupJid, {
-                                        document: { url: response.filePath },
-                                        mimetype: 'application/pdf',
-                                        fileName: path.basename(response.filePath),
-                                        caption: response.caption || ''
-                                    });
-                                }
-                                console.log('✅ تم إرسال الرد الكامل (نص + ملف)');
-                            } else {
-                                console.log(`❌ الملف غير موجود: ${response.filePath}`);
-                            }
-                        }
-                    }
-                } catch (error) {
-                    console.error('❌ خطأ في إرسال الرد:', error.message);
-                }
-            } else {
-                console.log('ℹ️ لم يتم العثور على كلمة مفتاحية - سيتم تجاهل الرسالة');
-                console.log('💡 تلميح: تأكد من تفعيل الردود (.تفعيل_ردود) أو إضافة ردود جديدة (.اضافة_رد)');
-            }
+            // إذا وصلنا هنا، معناه لا يوجد رد (لا keyword ولا AI)
+            console.log('ℹ️ لم يتم العثور على رد مناسب للرسالة');
         } else {
             console.log('⚠️ الرسالة ليست نصية');
         }
