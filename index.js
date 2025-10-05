@@ -368,8 +368,8 @@ async function handleNewMessage(msg) {
                 }
             } else if (keywordResponse && !hasAutoReplyAccess) {
                 // وُجد رد جاهز لكن المستخدم ليس لديه صلاحية
-                console.log(`🚫 المستخدم ${senderPhone} محظور من الردود الآلية`);
-                await sock.sendMessage(groupJid, { text: getAutomaticReplyBlockMessage() });
+                console.log(`🚫 المستخدم ${senderPhone} محظور من الردود الآلية - لا يتم الرد`);
+                // لا نرسل رسالة خطأ - نتجاهل الرسالة بشكل صامت
                 return;
             }
             
@@ -472,8 +472,8 @@ async function handleNewMessage(msg) {
                 }
             } else if (isGroqEnabled() && isAIEnabled() && !hasAIAccess) {
                 // AI مُفعّل لكن المستخدم ليس لديه صلاحية
-                console.log(`🚫 المستخدم ${senderPhone} محظور من الذكاء الاصطناعي`);
-                await sock.sendMessage(groupJid, { text: getAIBlockMessage() });
+                console.log(`🚫 المستخدم ${senderPhone} محظور من الذكاء الاصطناعي - لا يتم الرد`);
+                // لا نرسل رسالة خطأ - نتجاهل الرسالة بشكل صامت
                 return;
             } else {
                 console.log('ℹ️ Groq AI غير مُفعّل أو غير متاح');
