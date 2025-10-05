@@ -36,6 +36,7 @@ import { checkPrivateChatKeyword, isAIEnabled } from './plugins/privateChat.js';
 import { checkDueSchedules } from './plugins/alerts.js';
 import { generateDailyReport } from './plugins/reports.js';
 import { processWithGroqAI, isGroqEnabled } from './utils/groqAssistant.js';
+import { canUseAutomaticReplies, canUseAI, getAutomaticReplyBlockMessage, getAIBlockMessage } from './utils/accessControl.js';
 
 dotenv.config();
 
@@ -248,11 +249,14 @@ async function handleNewMessage(msg) {
         if (typeof text === 'string') {
             console.log(`📝 محتوى الرسالة: ${text.substring(0, 100)}${text.length > 100 ? '...' : ''}`);
             
+            // 🔒 التحقق من صلاحيات الوصول للردود الآلية
+            const hasAutoReplyAccess = canUseAutomaticReplies(senderPhone);
+            
             // 🎯 التحقق من الكلمات المفتاحية أولاً (توفير التوكينز)
             // إذا وُجد رد جاهز، لا حاجة لاستخدام AI
             const keywordResponse = checkPrivateChatKeyword(text);
             
-            if (keywordResponse) {
+            if (keywordResponse && hasAutoReplyAccess) {
                 console.log(`🔍 تم العثور على كلمة مفتاحية: ${keywordResponse.keyword}`);
                 console.log(`📝 نوع الرد: ${keywordResponse.responseType}`);
                 console.log(`💡 توفير التوكينز: تم الرد بدون استخدام AI`);
@@ -362,10 +366,18 @@ async function handleNewMessage(msg) {
                     console.error('❌ خطأ في إرسال الرد الجاهز:', error.message);
                     // سنحاول AI كخطة احتياطية
                 }
+            } else if (keywordResponse && !hasAutoReplyAccess) {
+                // وُجد رد جاهز لكن المستخدم ليس لديه صلاحية
+                console.log(`🚫 المستخدم ${senderPhone} محظور من الردود الآلية`);
+                await sock.sendMessage(groupJid, { text: getAutomaticReplyBlockMessage() });
+                return;
             }
             
+            // 🔒 التحقق من صلاحيات الوصول للذكاء الاصطناعي
+            const hasAIAccess = canUseAI(senderPhone);
+            
             // 🤖 استخدام Groq AI فقط إذا لم يتم العثور على رد جاهز (إذا كان مُفعّلاً)
-            if (isGroqEnabled() && isAIEnabled()) {
+            if (isGroqEnabled() && isAIEnabled() && hasAIAccess) {
                 console.log('🤖 لم يتم العثور على رد جاهز، استخدام Groq AI...');
                 
                 try {
@@ -458,6 +470,11 @@ async function handleNewMessage(msg) {
                 } catch (error) {
                     console.error('❌ خطأ في Groq AI:', error.message);
                 }
+            } else if (isGroqEnabled() && isAIEnabled() && !hasAIAccess) {
+                // AI مُفعّل لكن المستخدم ليس لديه صلاحية
+                console.log(`🚫 المستخدم ${senderPhone} محظور من الذكاء الاصطناعي`);
+                await sock.sendMessage(groupJid, { text: getAIBlockMessage() });
+                return;
             } else {
                 console.log('ℹ️ Groq AI غير مُفعّل أو غير متاح');
             }

@@ -26,6 +26,18 @@
   },
   "schedules": [],
   "admins": [],
+  "accessControl": {
+    "automaticReplies": {
+      "mode": "all",
+      "blockedUsers": [],
+      "allowedUsers": []
+    },
+    "aiResponses": {
+      "mode": "all",
+      "blockedUsers": [],
+      "allowedUsers": []
+    }
+  },
   "privateChatResponses": {
     "enabled": true,
     "intelligentMatching": true,
