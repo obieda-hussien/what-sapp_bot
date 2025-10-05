@@ -1008,6 +1008,19 @@ async function processWithGeminiAI(messages, tools) {
                 parts: [{ text: m.content || JSON.stringify(m) }]
             }));
         
+        // التأكد من أن أول رسالة في التاريخ هي من المستخدم (متطلب Gemini)
+        let historyForGemini = conversationHistory.slice(0, -1);
+        if (historyForGemini.length > 0 && historyForGemini[0].role !== 'user') {
+            // إزالة الرسائل من البداية حتى نجد أول رسالة من user
+            const firstUserIndex = historyForGemini.findIndex(m => m.role === 'user');
+            if (firstUserIndex > 0) {
+                historyForGemini = historyForGemini.slice(firstUserIndex);
+            } else if (firstUserIndex === -1) {
+                // لا توجد رسائل من user في التاريخ، نبدأ بتاريخ فارغ
+                historyForGemini = [];
+            }
+        }
+        
         // تحويل الأدوات إلى صيغة Gemini
         const geminiTools = tools.map(tool => ({
             functionDeclarations: [{
@@ -1019,7 +1032,7 @@ async function processWithGeminiAI(messages, tools) {
         
         // إنشاء الدردشة
         const chat = model.startChat({
-            history: conversationHistory.slice(0, -1), // كل الرسائل ماعدا الأخيرة
+            history: historyForGemini,
             tools: geminiTools,
             systemInstruction: systemPrompt
         });
