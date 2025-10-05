@@ -1044,7 +1044,7 @@ async function handleDisableAlertsCommand() {
 // ==================== أوامر الردود الآلية للمحادثات الخاصة ====================
 
 async function handleAddPrivateResponseCommand(args) {
-    if (args.length < 3) {
+    if (args.length < 2) {
         return {
             handled: true,
             response: '❌ الاستخدام الصحيح:\n' +
