@@ -1090,9 +1090,14 @@ async function processWithGeminiAI(messages, tools) {
             for (const call of functionCalls) {
                 const toolResult = await executeTool(call.name, call.args);
                 
+                // تنسيق الرد بشكل صحيح لـ Gemini
                 functionResponses.push({
-                    name: call.name,
-                    response: toolResult
+                    functionResponse: {
+                        name: call.name,
+                        response: {
+                            result: toolResult
+                        }
+                    }
                 });
                 
                 // حفظ نتيجة الأداة
