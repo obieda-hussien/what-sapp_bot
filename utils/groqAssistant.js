@@ -1056,9 +1056,17 @@ async function processWithGeminiAI(messages, tools) {
         const lastMessage = conversationHistory[conversationHistory.length - 1];
         let messageToSend = lastMessage.parts[0].text;
         
-        // إذا كان التاريخ فارغاً والمستخدم يرسل أول رسالة، نضيف السياق
+        // إذا كان التاريخ فارغاً أو قصير والمستخدم يرسل رسالة، نضيف السياق والإرشادات للأدوات
         if (systemPrompt && historyForGemini.length <= 2) {
-            messageToSend = `السياق: أنت مساعد ذكي للطلاب. تحدث بالعامية المصرية وكن ودوداً.\n\nالسؤال: ${messageToSend}`;
+            messageToSend = `أنت مساعد ذكي للطلاب. تحدث بالعامية المصرية وكن ودوداً.
+
+معلومات مهمة:
+- لديك أدوات (tools/functions) يمكنك استخدامها
+- عندما يطلب المستخدم ملف أو مادة، استخدم أداة send_file
+- عندما يطلب بحث في الإنترنت، استخدم أداة web_search
+- أنت من يستخدم الأدوات، ليس المستخدم
+
+السؤال: ${messageToSend}`;
         }
         
         const result = await chat.sendMessage(messageToSend);
@@ -1195,7 +1203,7 @@ export async function processWithGroqAI(userMessage, userId, userName = "الط�
         
         // الطلب الأول للحصول على الرد
         let response = await groq.chat.completions.create({
-            model: "llama-3.1-8b-instant", // نموذج أسرع وأقل استهلاكاً للتوكنز
+            model: "llama-3.1-70b-versatile", // نموذج متوازن: ذكي وسريع ومقبول في التوكنز
             messages: messages,
             tools: tools,
             tool_choice: "auto",
@@ -1255,7 +1263,7 @@ export async function processWithGroqAI(userMessage, userId, userName = "الط�
             
             // طلب ثانٍ للحصول على الرد النهائي بعد تنفيذ الأدوات
             response = await groq.chat.completions.create({
-                model: "llama-3.1-8b-instant", // نموذج أسرع وأقل استهلاكاً
+                model: "llama-3.1-70b-versatile", // نموذج متوازن: ذكي وسريع ومقبول في التوكنز
                 messages: messages,
                 temperature: 0.5, // تقليل للحد من الهلوسة
                 max_tokens: 800 // تقليل لتوفير التوكينز
