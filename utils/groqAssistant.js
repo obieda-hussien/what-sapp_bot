@@ -45,6 +45,7 @@ function analyzeConfigFiles() {
         lectures: [],
         summaries: [],
         assignments: [],
+        assignmentsWithText: [], // التكليفات مع النصوص
         responses: []
     };
     
@@ -57,7 +58,8 @@ function analyzeConfigFiles() {
                 type: item.responseType,
                 hasFile: !!item.filePath,
                 filePath: item.filePath,
-                hasText: !!item.text
+                hasText: !!item.text,
+                text: item.text
             };
             
             availableResources.responses.push(resourceInfo);
@@ -70,7 +72,29 @@ function analyzeConfigFiles() {
                 } else if (fileName.includes('ملخص') || fileName.includes('summary')) {
                     availableResources.summaries.push({ keywords, fileName });
                 } else if (fileName.includes('اسايمنت') || fileName.includes('assignment') || fileName.includes('تكليف')) {
-                    availableResources.assignments.push({ keywords, fileName });
+                    const assignmentInfo = { keywords, fileName };
+                    
+                    // إضافة النص إذا كان موجوداً (responseType: "both")
+                    if (item.text && (item.responseType === 'both' || item.responseType === 'text')) {
+                        assignmentInfo.text = item.text;
+                        availableResources.assignmentsWithText.push(assignmentInfo);
+                    }
+                    
+                    availableResources.assignments.push(assignmentInfo);
+                }
+            }
+            // التكليفات النصية فقط (بدون ملفات)
+            else if (item.text && (item.filePath === null || item.filePath === undefined)) {
+                const textOnlyAssignment = keywords.some(kw => 
+                    kw.includes('اسايمنت') || kw.includes('assignment') || kw.includes('تكليف')
+                );
+                
+                if (textOnlyAssignment) {
+                    availableResources.assignmentsWithText.push({
+                        keywords,
+                        text: item.text,
+                        fileName: null
+                    });
                 }
             }
         });
@@ -180,6 +204,26 @@ function createSystemPrompt() {
         });
     });
     
+    // إنشاء قائمة بالتكليفات مع النصوص
+    let assignmentsList = '';
+    if (resources.assignmentsWithText && resources.assignmentsWithText.length > 0) {
+        assignmentsList = `
+## Assignment Texts from Config (التكليفات المتاحة):
+`;
+        resources.assignmentsWithText.forEach((assignment, idx) => {
+            const keywordsStr = assignment.keywords.slice(0, 2).join(', '); // أول كلمتين فقط
+            assignmentsList += `
+${idx + 1}. **Keywords**: ${keywordsStr}
+   **Text**: ${assignment.text}${assignment.fileName ? `
+   **File**: ${assignment.fileName}` : ''}
+`;
+        });
+        
+        assignmentsList += `
+**IMPORTANT**: When a student asks about an assignment mentioned above, you can directly tell them the assignment text/requirements WITHOUT needing to send a file!
+`;
+    }
+    
     return `You are an intelligent and friendly educational assistant for university students in Egypt. Your name is "المساعد الذكي لعُبيدة" (Obeida's Smart Assistant).
 
 ## Your Personality and Style:
@@ -227,6 +271,7 @@ function createSystemPrompt() {
 ## Available Resources in Materials Folder:
 - **Total Files**: ${materialsData.total} files
 ${filesList}
+${assignmentsList}
 
 ## Important Guidelines:
 - Use tools to send files to students without mentioning the tool name to them
