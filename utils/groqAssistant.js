@@ -994,9 +994,9 @@ async function processWithGeminiAI(messages, tools) {
         
         console.log('🔄 التحويل إلى Gemini AI...');
         
-        // الحصول على النموذج - استخدام gemini-pro (الأكثر استقراراً وتوافراً)
+        // الحصول على النموذج - استخدام gemini-2.0-flash-exp (أسرع وأحدث نموذج)
         const model = gemini.getGenerativeModel({ 
-            model: "gemini-pro" 
+            model: "gemini-2.0-flash-exp" 
         });
         
         // تحويل الرسائل إلى صيغة Gemini
@@ -1195,7 +1195,7 @@ export async function processWithGroqAI(userMessage, userId, userName = "الط�
         
         // الطلب الأول للحصول على الرد
         let response = await groq.chat.completions.create({
-            model: "llama-3.3-70b-versatile", // النموذج المحدث - كان: "llama-3.1-70b-versatile"
+            model: "llama-3.1-8b-instant", // نموذج أسرع وأقل استهلاكاً للتوكنز
             messages: messages,
             tools: tools,
             tool_choice: "auto",
@@ -1255,7 +1255,7 @@ export async function processWithGroqAI(userMessage, userId, userName = "الط�
             
             // طلب ثانٍ للحصول على الرد النهائي بعد تنفيذ الأدوات
             response = await groq.chat.completions.create({
-                model: "llama-3.3-70b-versatile", // النموذج المحدث
+                model: "llama-3.1-8b-instant", // نموذج أسرع وأقل استهلاكاً
                 messages: messages,
                 temperature: 0.5, // تقليل للحد من الهلوسة
                 max_tokens: 800 // تقليل لتوفير التوكينز
