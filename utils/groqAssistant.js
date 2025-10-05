@@ -1021,6 +1021,18 @@ async function processWithGeminiAI(messages, tools) {
             }
         }
         
+        // إذا كان هناك system prompt وتاريخ فارغ، نضيف رسالة افتتاحية من المستخدم تحتوي على السياق
+        if (systemPrompt && historyForGemini.length === 0) {
+            historyForGemini.push({
+                role: 'user',
+                parts: [{ text: 'مرحباً' }]
+            });
+            historyForGemini.push({
+                role: 'model',
+                parts: [{ text: 'مرحباً! أنا مساعدك الذكي. كيف يمكنني مساعدتك؟' }]
+            });
+        }
+        
         // تحويل الأدوات إلى صيغة Gemini
         const geminiTools = tools.map(tool => ({
             functionDeclarations: [{
@@ -1030,16 +1042,26 @@ async function processWithGeminiAI(messages, tools) {
             }]
         }));
         
-        // إنشاء الدردشة
-        const chat = model.startChat({
+        // إنشاء خيارات الدردشة بدون systemInstruction لتجنب الأخطاء
+        // سيتم دمج السياق في الرسائل بدلاً من ذلك
+        const chatOptions = {
             history: historyForGemini,
-            tools: geminiTools,
-            systemInstruction: systemPrompt
-        });
+            tools: geminiTools
+        };
         
-        // إرسال آخر رسالة
+        // إنشاء الدردشة
+        const chat = model.startChat(chatOptions);
+        
+        // إرسال آخر رسالة - إذا كان هناك system prompt، نضيفه كسياق في الرسالة
         const lastMessage = conversationHistory[conversationHistory.length - 1];
-        const result = await chat.sendMessage(lastMessage.parts[0].text);
+        let messageToSend = lastMessage.parts[0].text;
+        
+        // إذا كان التاريخ فارغاً والمستخدم يرسل أول رسالة، نضيف السياق
+        if (systemPrompt && historyForGemini.length <= 2) {
+            messageToSend = `السياق: أنت مساعد ذكي للطلاب. تحدث بالعامية المصرية وكن ودوداً.\n\nالسؤال: ${messageToSend}`;
+        }
+        
+        const result = await chat.sendMessage(messageToSend);
         const response = result.response;
         
         let finalResponse = {
