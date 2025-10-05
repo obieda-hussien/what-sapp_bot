@@ -994,9 +994,9 @@ async function processWithGeminiAI(messages, tools) {
         
         console.log('🔄 التحويل إلى Gemini AI...');
         
-        // الحصول على النموذج
+        // الحصول على النموذج - استخدام gemini-1.5-flash أو gemini-pro
         const model = gemini.getGenerativeModel({ 
-            model: "gemini-1.5-flash-latest" 
+            model: "gemini-1.5-flash" 
         });
         
         // تحويل الرسائل إلى صيغة Gemini
