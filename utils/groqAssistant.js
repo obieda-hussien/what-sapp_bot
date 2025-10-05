@@ -1110,6 +1110,42 @@ export async function processWithGroqAI(userMessage, userId, userName = "الط�
         console.log(`\n🤖 Groq AI - معالجة رسالة من ${userName}`);
         console.log(`📝 الرسالة: ${userMessage}`);
         
+        // التحقق من رسائل الشكر/التقدير البسيطة بعد إرسال ملف
+        // نستخدم كلمة واحدة أو كلمتين فقط لتجنب الرسائل الطويلة
+        const messageTrimmed = userMessage.trim();
+        const wordCount = messageTrimmed.split(/\s+/).length;
+        const thankYouPatterns = /^(شكر.*|تسلم.*|ماشي|تمام|ok|thanks|thank you|thx|👍|🙏|❤️)$/i;
+        const isThankYouMessage = wordCount <= 2 && thankYouPatterns.test(messageTrimmed);
+        
+        // إذا كانت رسالة شكر بسيطة، نتحقق من آخر رد للبوت
+        if (isThankYouMessage) {
+            const context = getConversationContext(userId);
+            // إذا كان آخر رد من البوت يتضمن "تم إرسال الملف" فهذا يعني أن المستخدم يشكر على ملف تم إرساله
+            const lastBotMessage = context.length > 0 && context[context.length - 1].role === 'assistant' 
+                ? context[context.length - 1].content 
+                : '';
+            
+            if (lastBotMessage.includes('تم إرسال الملف') || lastBotMessage.includes('📚')) {
+                // رد بسيط بدون استخدام الـ AI ولا حفظ في الذاكرة لتجنب الهلوسة
+                const simpleResponses = [
+                    'العفو يا فندم! 😊',
+                    'ربنا يوفقك! 📚',
+                    'على الرحب والسعة! 🎓',
+                    'تمام، لو محتاج حاجة تانية أنا موجود! ✨'
+                ];
+                const randomResponse = simpleResponses[Math.floor(Math.random() * simpleResponses.length)];
+                
+                console.log('✅ رد تلقائي على رسالة شكر بعد إرسال ملف (بدون حفظ في الذاكرة)');
+                return {
+                    success: true,
+                    text: randomResponse,
+                    action: null,
+                    fileInfo: null,
+                    filesToSend: []
+                };
+            }
+        }
+        
         // إضافة رسالة المستخدم للذاكرة
         addToMemory(userId, "user", userMessage);
         
@@ -1197,7 +1233,13 @@ export async function processWithGroqAI(userMessage, userId, userName = "الط�
         const botResponse = assistantMessage.content || "";
         
         // إضافة رد البوت للذاكرة
-        addToMemory(userId, "assistant", botResponse);
+        // إذا تم إرسال ملف، نحفظ نسخة مختصرة جداً في الذاكرة لتجنب الهلوسة
+        let responseToStore = botResponse;
+        if (finalResponse.action === 'send_file' || finalResponse.action === 'send_folder') {
+            // تقصير الرد لإزالة التفاصيل التي قد تسبب إعادة إرسال
+            responseToStore = "تمام، تم إرسال الملف المطلوب 📚";
+        }
+        addToMemory(userId, "assistant", responseToStore);
         
         finalResponse.text = botResponse;
         
