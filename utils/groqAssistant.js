@@ -4,6 +4,7 @@
  */
 
 import Groq from 'groq-sdk';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { loadConfig } from '../utils/config.js';
 import fs from 'fs';
 import path from 'path';
@@ -16,6 +17,9 @@ const __dirname = path.dirname(__filename);
 // تهيئة Groq API
 let groqClient = null;
 
+// تهيئة Google Gemini API
+let geminiClient = null;
+
 /**
  * تهيئة Groq Client
  */
@@ -26,6 +30,16 @@ function initGroq() {
         });
     }
     return groqClient;
+}
+
+/**
+ * تهيئة Google Gemini Client
+ */
+function initGemini() {
+    if (!geminiClient && process.env.GEMINI_API_KEY) {
+        geminiClient = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    }
+    return geminiClient;
 }
 
 // تخزين سياق المحادثات (ذاكرة البوت)
@@ -45,6 +59,7 @@ function analyzeConfigFiles() {
         lectures: [],
         summaries: [],
         assignments: [],
+        assignmentsWithText: [], // التكليفات مع النصوص
         responses: []
     };
     
@@ -57,7 +72,8 @@ function analyzeConfigFiles() {
                 type: item.responseType,
                 hasFile: !!item.filePath,
                 filePath: item.filePath,
-                hasText: !!item.text
+                hasText: !!item.text,
+                text: item.text
             };
             
             availableResources.responses.push(resourceInfo);
@@ -70,7 +86,29 @@ function analyzeConfigFiles() {
                 } else if (fileName.includes('ملخص') || fileName.includes('summary')) {
                     availableResources.summaries.push({ keywords, fileName });
                 } else if (fileName.includes('اسايمنت') || fileName.includes('assignment') || fileName.includes('تكليف')) {
-                    availableResources.assignments.push({ keywords, fileName });
+                    const assignmentInfo = { keywords, fileName };
+                    
+                    // إضافة النص إذا كان موجوداً (responseType: "both")
+                    if (item.text && (item.responseType === 'both' || item.responseType === 'text')) {
+                        assignmentInfo.text = item.text;
+                        availableResources.assignmentsWithText.push(assignmentInfo);
+                    }
+                    
+                    availableResources.assignments.push(assignmentInfo);
+                }
+            }
+            // التكليفات النصية فقط (بدون ملفات)
+            else if (item.text && (item.filePath === null || item.filePath === undefined)) {
+                const textOnlyAssignment = keywords.some(kw => 
+                    kw.includes('اسايمنت') || kw.includes('assignment') || kw.includes('تكليف')
+                );
+                
+                if (textOnlyAssignment) {
+                    availableResources.assignmentsWithText.push({
+                        keywords,
+                        text: item.text,
+                        fileName: null
+                    });
                 }
             }
         });
@@ -180,6 +218,26 @@ function createSystemPrompt() {
         });
     });
     
+    // إنشاء قائمة بالتكليفات مع النصوص
+    let assignmentsList = '';
+    if (resources.assignmentsWithText && resources.assignmentsWithText.length > 0) {
+        assignmentsList = `
+## Assignment Texts from Config (التكليفات المتاحة):
+`;
+        resources.assignmentsWithText.forEach((assignment, idx) => {
+            const keywordsStr = assignment.keywords.slice(0, 2).join(', '); // أول كلمتين فقط
+            assignmentsList += `
+${idx + 1}. **Keywords**: ${keywordsStr}
+   **Text**: ${assignment.text}${assignment.fileName ? `
+   **File**: ${assignment.fileName}` : ''}
+`;
+        });
+        
+        assignmentsList += `
+**IMPORTANT**: When a student asks about an assignment mentioned above, you can directly tell them the assignment text/requirements WITHOUT needing to send a file!
+`;
+    }
+    
     return `You are an intelligent and friendly educational assistant for university students in Egypt. Your name is "المساعد الذكي لعُبيدة" (Obeida's Smart Assistant).
 
 ## Your Personality and Style:
@@ -213,6 +271,12 @@ function createSystemPrompt() {
 - **DON'T respond** to: Empty messages, single emojis without context, "ok", "👍", or clearly not directed at you
 - **Use your judgment**: If uncertain, it's better to respond briefly than ignore
 - **Be autonomous**: Make decisions about what information to provide based on what would help the student most
+- **CRITICAL - AVOID RE-SENDING**: If you ALREADY sent a file to the user and they respond with simple acknowledgments like "شكراً" (thank you), "تمام" (okay), "ماشي" (alright), or "تسلم" (thanks), DO NOT send the file again! Just respond with a friendly acknowledgment like "العفو يا فندم! 😊" or "ربنا يوفقك! 📚" without calling any tools.
+
+## Conversation State Awareness:
+- **After File Delivery**: When you've just sent a file and the user says "thank you" or similar closing remarks, they are ENDING the conversation, NOT requesting the file again
+- **Simple Acknowledgments Are Not Requests**: Messages like "شكراً", "تسلم", "ماشي", "ok", "👍" after you've provided help mean the user is satisfied - don't repeat your previous action
+- **Move Forward**: If the user thanks you after receiving help, acknowledge and ask if they need anything else, but don't re-send what you just sent
 
 ## Examples of Your Responses:
 - "ماشي يا فندم! 😊 هبعتلك ملخص المحاضرة الأولى دلوقتي" (Okay sir! I'll send you the first lecture summary now)
@@ -227,6 +291,7 @@ function createSystemPrompt() {
 ## Available Resources in Materials Folder:
 - **Total Files**: ${materialsData.total} files
 ${filesList}
+${assignmentsList}
 
 ## Important Guidelines:
 - Use tools to send files to students without mentioning the tool name to them
@@ -911,6 +976,124 @@ async function executeTool(toolName, toolArgs) {
 /**
  * المعالجة الرئيسية بواسطة Groq AI
  */
+/**
+ * معالجة الرسالة باستخدام Google Gemini AI (Fallback)
+ */
+async function processWithGeminiAI(messages, tools) {
+    try {
+        const gemini = initGemini();
+        
+        if (!gemini) {
+            console.log('⚠️ Gemini API غير مُفعّل - GEMINI_API_KEY غير موجود');
+            return {
+                success: false,
+                message: null,
+                error: "Gemini API not configured"
+            };
+        }
+        
+        console.log('🔄 التحويل إلى Gemini AI...');
+        
+        // الحصول على النموذج
+        const model = gemini.getGenerativeModel({ 
+            model: "gemini-1.5-flash-latest" 
+        });
+        
+        // تحويل الرسائل إلى صيغة Gemini
+        const systemPrompt = messages.find(m => m.role === 'system')?.content || '';
+        const conversationHistory = messages
+            .filter(m => m.role !== 'system')
+            .map(m => ({
+                role: m.role === 'assistant' ? 'model' : 'user',
+                parts: [{ text: m.content || JSON.stringify(m) }]
+            }));
+        
+        // تحويل الأدوات إلى صيغة Gemini
+        const geminiTools = tools.map(tool => ({
+            functionDeclarations: [{
+                name: tool.function.name,
+                description: tool.function.description,
+                parameters: tool.function.parameters
+            }]
+        }));
+        
+        // إنشاء الدردشة
+        const chat = model.startChat({
+            history: conversationHistory.slice(0, -1), // كل الرسائل ماعدا الأخيرة
+            tools: geminiTools,
+            systemInstruction: systemPrompt
+        });
+        
+        // إرسال آخر رسالة
+        const lastMessage = conversationHistory[conversationHistory.length - 1];
+        const result = await chat.sendMessage(lastMessage.parts[0].text);
+        const response = result.response;
+        
+        let finalResponse = {
+            success: true,
+            text: null,
+            action: null,
+            fileInfo: null,
+            filesToSend: []
+        };
+        
+        // التعامل مع استدعاءات الأدوات
+        const functionCalls = response.functionCalls();
+        if (functionCalls && functionCalls.length > 0) {
+            console.log(`🔧 Gemini يستخدم ${functionCalls.length} أداة`);
+            
+            const functionResponses = [];
+            
+            for (const call of functionCalls) {
+                const toolResult = await executeTool(call.name, call.args);
+                
+                functionResponses.push({
+                    name: call.name,
+                    response: toolResult
+                });
+                
+                // حفظ نتيجة الأداة
+                if (toolResult.success && toolResult.action === "send_file") {
+                    finalResponse.filesToSend.push(toolResult.fileInfo);
+                    if (!finalResponse.action) {
+                        finalResponse.action = "send_file";
+                        finalResponse.fileInfo = toolResult.fileInfo;
+                    }
+                } else if (toolResult.success && toolResult.action === "send_folder") {
+                    finalResponse.filesToSend.push(...toolResult.files);
+                    if (!finalResponse.action) {
+                        finalResponse.action = "send_folder";
+                    }
+                } else if (toolResult.success && toolResult.action === "text_content") {
+                    finalResponse.textFileContent = toolResult.content;
+                }
+            }
+            
+            // الحصول على الرد النهائي بعد تنفيذ الأدوات
+            const finalResult = await chat.sendMessage(functionResponses);
+            finalResponse.text = finalResult.response.text();
+        } else {
+            // رد نصي مباشر بدون أدوات
+            finalResponse.text = response.text();
+        }
+        
+        console.log(`✅ رد Gemini: ${finalResponse.text.substring(0, 100)}...`);
+        if (finalResponse.action) {
+            console.log(`📎 إجراء: ${finalResponse.action}`);
+        }
+        
+        return finalResponse;
+        
+    } catch (error) {
+        console.error('❌ خطأ في Gemini AI:', error.message);
+        return {
+            success: false,
+            message: null,
+            error: error.message
+        };
+    }
+}
+
 export async function processWithGroqAI(userMessage, userId, userName = "الطالب") {
     try {
         const groq = initGroq();
@@ -1027,11 +1210,53 @@ export async function processWithGroqAI(userMessage, userId, userName = "الط�
         
     } catch (error) {
         console.error('❌ خطأ في Groq AI:', error.message);
-        return {
-            success: false,
-            message: null,
-            error: error.message
-        };
+        console.log('🔄 محاولة التحويل إلى Gemini كـ Fallback...');
+        
+        // محاولة استخدام Gemini كـ Fallback
+        try {
+            // إضافة رسالة المستخدم للذاكرة إذا لم تكن مضافة
+            const currentMemory = getConversationContext(userId);
+            const lastMessage = currentMemory[currentMemory.length - 1];
+            if (!lastMessage || lastMessage.content !== userMessage) {
+                addToMemory(userId, "user", userMessage);
+            }
+            
+            // بناء المحادثة مع السياق
+            const messages = [
+                {
+                    role: "system",
+                    content: createSystemPrompt()
+                },
+                ...getConversationContext(userId)
+            ];
+            
+            // استخدام Gemini كـ Fallback
+            const geminiResponse = await processWithGeminiAI(messages, tools);
+            
+            if (geminiResponse.success) {
+                // إضافة رد Gemini للذاكرة
+                if (geminiResponse.text) {
+                    addToMemory(userId, "assistant", geminiResponse.text);
+                }
+                console.log('✅ نجح Fallback إلى Gemini!');
+                return geminiResponse;
+            } else {
+                // فشل Gemini أيضاً
+                console.error('❌ فشل Gemini Fallback أيضاً');
+                return {
+                    success: false,
+                    message: null,
+                    error: `Groq failed: ${error.message}, Gemini also failed: ${geminiResponse.error}`
+                };
+            }
+        } catch (fallbackError) {
+            console.error('❌ فشل Gemini Fallback:', fallbackError.message);
+            return {
+                success: false,
+                message: null,
+                error: `Groq failed: ${error.message}, Gemini fallback failed: ${fallbackError.message}`
+            };
+        }
     }
 }
 

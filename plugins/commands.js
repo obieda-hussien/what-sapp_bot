@@ -156,7 +156,7 @@ export async function handleCommand(msg, sock, telegramBot) {
             
             case 'اضافة_نخبة':
             case 'add_elite':
-                return await handleAddEliteCommand(args);
+                return await handleAddEliteCommand(args, sock);
             
             case 'حذف_نخبة':
             case 'remove_elite':
@@ -495,28 +495,107 @@ async function handleListChannelsCommand() {
 }
 
 /**
+ * البحث عن LID للمستخدم من الجروبات
+ */
+async function findUserLID(sock, phoneNumber) {
+    try {
+        // البحث في جميع الجروبات
+        const groups = await sock.groupFetchAllParticipating();
+        
+        for (const groupId in groups) {
+            const group = groups[groupId];
+            
+            // البحث عن المستخدم في أعضاء الجروب
+            for (const participant of group.participants) {
+                const participantId = participant.id;
+                
+                // فحص إذا كان رقم الهاتف يطابق
+                if (participantId.startsWith(phoneNumber)) {
+                    // استخراج LID إذا كان موجوداً
+                    if (participantId.includes(':') && participantId.includes('@lid')) {
+                        console.log(`🔍 تم العثور على LID للمستخدم ${phoneNumber}: ${participantId}`);
+                        return participantId;
+                    }
+                }
+            }
+        }
+        
+        console.log(`ℹ️  لم يتم العثور على LID للمستخدم ${phoneNumber}`);
+        return null;
+    } catch (error) {
+        console.error('❌ خطأ في البحث عن LID:', error.message);
+        return null;
+    }
+}
+
+/**
  * أمر إضافة مستخدم للنخبة
  */
-async function handleAddEliteCommand(args) {
+async function handleAddEliteCommand(args, sock) {
     if (args.length < 1) {
         return {
             handled: true,
-            response: '❌ الاستخدام الصحيح:\n.اضافة_نخبة <رقم_الهاتف>\n\nمثال:\n.اضافة_نخبة 201234567890'
+            response: '❌ الاستخدام الصحيح:\n.اضافة_نخبة <رقم_الهاتف> [LID]\n\nأمثلة:\n.اضافة_نخبة 201234567890\n.اضافة_نخبة 201234567890 225060749086880:22@lid\n.اضافة_نخبة 225060749086880:22@lid'
         };
     }
     
-    const phoneNumber = args[0].replace(/\D/g, ''); // إزالة أي شيء غير الأرقام
-    const success = addEliteUser(phoneNumber);
+    const addedItems = [];
+    let phoneAdded = false;
+    let lidAdded = false;
+    let phoneNumber = null;
     
-    if (success) {
+    // معالجة جميع المعاملات (يمكن أن يكون رقم، LID، أو كلاهما)
+    for (let i = 0; i < args.length; i++) {
+        const identifier = args[i].trim();
+        
+        // إذا كان LID (يحتوي على : و @lid)
+        const isLid = identifier.includes(':') && identifier.includes('@lid');
+        
+        if (isLid) {
+            // إضافة LID
+            const success = addEliteUser(identifier);
+            if (success) {
+                addedItems.push(`LID: ${identifier}`);
+                lidAdded = true;
+            }
+        } else {
+            // رقم الهاتف - نزيل أي شيء غير الأرقام
+            const cleanPhone = identifier.replace(/\D/g, '');
+            if (cleanPhone) {
+                phoneNumber = cleanPhone; // حفظ رقم الهاتف للبحث عن LID
+                const success = addEliteUser(cleanPhone);
+                if (success) {
+                    addedItems.push(`رقم الهاتف: ${cleanPhone}`);
+                    phoneAdded = true;
+                }
+            }
+        }
+    }
+    
+    // إذا تم إضافة رقم هاتف فقط ولم يتم إضافة LID، نحاول جلب LID تلقائياً
+    if (phoneAdded && !lidAdded && phoneNumber && sock) {
+        console.log(`🔎 البحث عن LID للمستخدم ${phoneNumber}...`);
+        const userLID = await findUserLID(sock, phoneNumber);
+        
+        if (userLID) {
+            // إضافة LID تلقائياً
+            const success = addEliteUser(userLID);
+            if (success) {
+                addedItems.push(`LID: ${userLID} (تم جلبه تلقائياً ✨)`);
+                lidAdded = true;
+            }
+        }
+    }
+    
+    if (addedItems.length > 0) {
         return {
             handled: true,
-            response: `✅ تم إضافة المستخدم للنخبة بنجاح!\n\n📱 الرقم: ${phoneNumber}`
+            response: `✅ تم إضافة المستخدم للنخبة بنجاح!\n\n📱 تم إضافة:\n${addedItems.map(item => `   • ${item}`).join('\n')}`
         };
     } else {
         return {
             handled: true,
-            response: '❌ المستخدم موجود بالفعل في النخبة'
+            response: '❌ المستخدم موجود بالفعل في النخبة أو لم يتم تقديم معرفات صحيحة'
         };
     }
 }
@@ -528,22 +607,50 @@ async function handleRemoveEliteCommand(args) {
     if (args.length < 1) {
         return {
             handled: true,
-            response: '❌ الاستخدام الصحيح:\n.حذف_نخبة <رقم_الهاتف>\n\nمثال:\n.حذف_نخبة 201234567890'
+            response: '❌ الاستخدام الصحيح:\n.حذف_نخبة <رقم_الهاتف> [LID]\n\nأمثلة:\n.حذف_نخبة 201234567890\n.حذف_نخبة 201234567890 225060749086880:22@lid\n.حذف_نخبة 225060749086880:22@lid'
         };
     }
     
-    const phoneNumber = args[0].replace(/\D/g, '');
-    const success = removeEliteUser(phoneNumber);
+    const removedItems = [];
+    let phoneRemoved = false;
+    let lidRemoved = false;
     
-    if (success) {
+    // معالجة جميع المعاملات (يمكن أن يكون رقم، LID، أو كلاهما)
+    for (let i = 0; i < args.length; i++) {
+        const identifier = args[i].trim();
+        
+        // إذا كان LID (يحتوي على : و @lid)
+        const isLid = identifier.includes(':') && identifier.includes('@lid');
+        
+        if (isLid) {
+            // حذف LID
+            const success = removeEliteUser(identifier);
+            if (success) {
+                removedItems.push(`LID: ${identifier}`);
+                lidRemoved = true;
+            }
+        } else {
+            // رقم الهاتف - نزيل أي شيء غير الأرقام
+            const cleanPhone = identifier.replace(/\D/g, '');
+            if (cleanPhone) {
+                const success = removeEliteUser(cleanPhone);
+                if (success) {
+                    removedItems.push(`رقم الهاتف: ${cleanPhone}`);
+                    phoneRemoved = true;
+                }
+            }
+        }
+    }
+    
+    if (removedItems.length > 0) {
         return {
             handled: true,
-            response: `✅ تم حذف المستخدم من النخبة بنجاح!\n\n📱 الرقم: ${phoneNumber}`
+            response: `✅ تم حذف المستخدم من النخبة بنجاح!\n\n📱 تم حذف:\n${removedItems.map(item => `   • ${item}`).join('\n')}`
         };
     } else {
         return {
             handled: true,
-            response: '❌ المستخدم غير موجود في النخبة'
+            response: '❌ المستخدم غير موجود في النخبة أو لم يتم تقديم معرفات صحيحة'
         };
     }
 }
@@ -937,7 +1044,7 @@ async function handleDisableAlertsCommand() {
 // ==================== أوامر الردود الآلية للمحادثات الخاصة ====================
 
 async function handleAddPrivateResponseCommand(args) {
-    if (args.length < 3) {
+    if (args.length < 2) {
         return {
             handled: true,
             response: '❌ الاستخدام الصحيح:\n' +

@@ -340,7 +340,7 @@ export function shouldFilterMessage(senderPhone, messageText, messageType) {
     }
 
     // Keyword filter
-    if (config.filters.keywords.length > 0 && messageText) {
+    if (config.filters.keywords.length > 0 && messageText && typeof messageText === 'string') {
         const hasKeyword = config.filters.keywords.some(keyword => 
             messageText.toLowerCase().includes(keyword.toLowerCase())
         );
