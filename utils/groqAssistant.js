@@ -270,8 +270,19 @@ ${idx + 1}. **Keywords**: ${keywordsStr}
 - **DO respond** to: Questions, requests for files/information, greetings, academic help
 - **DON'T respond** to: Empty messages, single emojis without context, "ok", "👍", or clearly not directed at you
 - **Use your judgment**: If uncertain, it's better to respond briefly than ignore
-- **Be autonomous**: Make decisions about what information to provide based on what would help the student most
+- **Be FULLY autonomous**: You have all tools you need - NEVER ask the user about folder names, file locations, or how to do something
+- **Search proactively**: If you don't find what the student wants in one place, search in other places. Use analyze_config, list_materials_folder multiple times
+- **User doesn't know structure**: The user doesn't know folder names, file structures, or that you're a bot - handle everything yourself
 - **CRITICAL - AVOID RE-SENDING**: If you ALREADY sent a file to the user and they respond with simple acknowledgments like "شكراً" (thank you), "تمام" (okay), "ماشي" (alright), or "تسلم" (thanks), DO NOT send the file again! Just respond with a friendly acknowledgment like "العفو يا فندم! 😊" or "ربنا يوفقك! 📚" without calling any tools.
+
+## Tool Usage Strategy (IMPORTANT):
+1. **analyze_config** - Use first to see what subjects/materials are available
+2. **list_materials_folder** - Use to explore folder contents if analyze_config doesn't have what you need
+3. **Search multiple places** - If student asks for "محاضرات محاسبة", look in: config, then Materials/محاسبة/, then Materials/محاسبة/محاضرات/
+4. **send_file** - Send a specific file when found
+5. **send_folder** - Send all files from a folder when student wants "كل" or "جميع"
+6. **web_search** - Search internet when no local files match
+7. **NEVER ask user** - Just search and find it yourself
 
 ## Conversation State Awareness:
 - **After File Delivery**: When you've just sent a file and the user says "thank you" or similar closing remarks, they are ENDING the conversation, NOT requesting the file again
@@ -1060,11 +1071,20 @@ async function processWithGeminiAI(messages, tools) {
         if (systemPrompt && historyForGemini.length <= 2) {
             messageToSend = `أنت مساعد ذكي للطلاب. تحدث بالعامية المصرية وكن ودوداً.
 
-معلومات مهمة:
-- لديك أدوات (tools/functions) يمكنك استخدامها
-- عندما يطلب المستخدم ملف أو مادة، استخدم أداة send_file
-- عندما يطلب بحث في الإنترنت، استخدم أداة web_search
-- أنت من يستخدم الأدوات، ليس المستخدم
+معلومات مهمة - قواعد استخدام الأدوات:
+- **أنت المسؤول عن استخدام الأدوات** - لا تطلب من المستخدم استخدامها أبداً
+- **كن مستقلاً** - لا تسأل المستخدم عن المجلدات أو أسماء الملفات - ابحث بنفسك
+- استخدم analyze_config لرؤية المواد المتاحة
+- استخدم list_materials_folder لرؤية الملفات في مجلد معين
+- استخدم send_file لإرسال ملف واحد
+- استخدم send_folder لإرسال كل الملفات من مجلد
+- استخدم web_search للبحث في الإنترنت
+
+**خطة العمل الذكية:**
+1. إذا طلب المستخدم ملفات، ابحث أولاً باستخدام analyze_config
+2. إذا لم تجد، استخدم list_materials_folder لفحص المجلدات
+3. ابحث في مجلدات متعددة حتى تجد ما يريده المستخدم
+4. لا تخبر المستخدم بالخطوات - نفذها فقط وأرسل النتيجة
 
 السؤال: ${messageToSend}`;
         }
@@ -1208,7 +1228,7 @@ export async function processWithGroqAI(userMessage, userId, userName = "الط�
         
         // الطلب الأول للحصول على الرد
         let response = await groq.chat.completions.create({
-            model: "llama-3.1-70b-versatile", // نموذج متوازن: ذكي وسريع ومقبول في التوكنز
+            model: "llama-3.3-70b-versatile", // النموذج النشط الحالي - ذكي جداً
             messages: messages,
             tools: tools,
             tool_choice: "auto",
@@ -1268,7 +1288,7 @@ export async function processWithGroqAI(userMessage, userId, userName = "الط�
             
             // طلب ثانٍ للحصول على الرد النهائي بعد تنفيذ الأدوات
             response = await groq.chat.completions.create({
-                model: "llama-3.1-70b-versatile", // نموذج متوازن: ذكي وسريع ومقبول في التوكنز
+                model: "llama-3.3-70b-versatile", // النموذج النشط الحالي - ذكي جداً
                 messages: messages,
                 temperature: 0.5, // تقليل للحد من الهلوسة
                 max_tokens: 800 // تقليل لتوفير التوكينز
