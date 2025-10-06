@@ -33,12 +33,18 @@
 
 - **[INSTALL.md](INSTALL.md)** - دليل التنصيب الكامل (يدوي، VPS، Termux، Fork)
 - **[GROQ_AI_GUIDE.md](GROQ_AI_GUIDE.md)** - دليل استخدام الذكاء الاصطناعي Groq AI
-- **[AI_MODELS_HOSTING_GUIDE.md](AI_MODELS_HOSTING_GUIDE.md)** - 🆕 **دليل شامل عن:**
+- **[AI_MODELS_HOSTING_GUIDE.md](AI_MODELS_HOSTING_GUIDE.md)** - **دليل شامل عن:**
   - نماذج الذكاء الاصطناعي المجانية ومفتوحة المصدر
   - مقارنة بين Groq، Gemini، OpenAI، وغيرها
   - خيارات الاستضافة المجانية والمحدودة
   - Oracle Cloud، DigitalOcean، Raspberry Pi، وأكثر
   - أفضل الممارسات والتوصيات
+- **[SELF_HOSTED_AI_GUIDE.md](SELF_HOSTED_AI_GUIDE.md)** - 🆕 **دليل استضافة نماذج AI الخاصة:**
+  - تنزيل واستضافة نماذج مفتوحة المصدر (Llama, Mistral)
+  - استخدام Ollama و vLLM
+  - استضافة على RunPod, Vast.ai بدون حدود
+  - التكامل الكامل مع البوت
+  - مقارنة التكاليف والأداء
 - **[ACCESS_CONTROL_GUIDE.md](ACCESS_CONTROL_GUIDE.md)** - دليل التحكم في الوصول
 - **[CONVERSATION_EXAMPLES.md](CONVERSATION_EXAMPLES.md)** - أمثلة على المحادثات
 - **[FUTURE_FEATURES_REPORT.md](FUTURE_FEATURES_REPORT.md)** - 🆕 **تقرير شامل عن:**
