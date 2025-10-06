@@ -270,8 +270,19 @@ ${idx + 1}. **Keywords**: ${keywordsStr}
 - **DO respond** to: Questions, requests for files/information, greetings, academic help
 - **DON'T respond** to: Empty messages, single emojis without context, "ok", "👍", or clearly not directed at you
 - **Use your judgment**: If uncertain, it's better to respond briefly than ignore
-- **Be autonomous**: Make decisions about what information to provide based on what would help the student most
+- **Be FULLY autonomous**: You have all tools you need - NEVER ask the user about folder names, file locations, or how to do something
+- **Search proactively**: If you don't find what the student wants in one place, search in other places. Use analyze_config, list_materials_folder multiple times
+- **User doesn't know structure**: The user doesn't know folder names, file structures, or that you're a bot - handle everything yourself
 - **CRITICAL - AVOID RE-SENDING**: If you ALREADY sent a file to the user and they respond with simple acknowledgments like "شكراً" (thank you), "تمام" (okay), "ماشي" (alright), or "تسلم" (thanks), DO NOT send the file again! Just respond with a friendly acknowledgment like "العفو يا فندم! 😊" or "ربنا يوفقك! 📚" without calling any tools.
+
+## Tool Usage Strategy (IMPORTANT):
+1. **analyze_config** - Use first to see what subjects/materials are available
+2. **list_materials_folder** - Use to explore folder contents if analyze_config doesn't have what you need
+3. **Search multiple places** - If student asks for "محاضرات محاسبة", look in: config, then Materials/محاسبة/, then Materials/محاسبة/محاضرات/
+4. **send_file** - Send a specific file when found
+5. **send_folder** - Send all files from a folder when student wants "كل" or "جميع"
+6. **web_search** - Search internet when no local files match
+7. **NEVER ask user** - Just search and find it yourself
 
 ## Conversation State Awareness:
 - **After File Delivery**: When you've just sent a file and the user says "thank you" or similar closing remarks, they are ENDING the conversation, NOT requesting the file again
@@ -994,9 +1005,9 @@ async function processWithGeminiAI(messages, tools) {
         
         console.log('🔄 التحويل إلى Gemini AI...');
         
-        // الحصول على النموذج
+        // الحصول على النموذج - استخدام gemini-2.0-flash-exp (أسرع وأحدث نموذج)
         const model = gemini.getGenerativeModel({ 
-            model: "gemini-1.5-flash-latest" 
+            model: "gemini-2.0-flash-exp" 
         });
         
         // تحويل الرسائل إلى صيغة Gemini
@@ -1008,6 +1019,31 @@ async function processWithGeminiAI(messages, tools) {
                 parts: [{ text: m.content || JSON.stringify(m) }]
             }));
         
+        // التأكد من أن أول رسالة في التاريخ هي من المستخدم (متطلب Gemini)
+        let historyForGemini = conversationHistory.slice(0, -1);
+        if (historyForGemini.length > 0 && historyForGemini[0].role !== 'user') {
+            // إزالة الرسائل من البداية حتى نجد أول رسالة من user
+            const firstUserIndex = historyForGemini.findIndex(m => m.role === 'user');
+            if (firstUserIndex > 0) {
+                historyForGemini = historyForGemini.slice(firstUserIndex);
+            } else if (firstUserIndex === -1) {
+                // لا توجد رسائل من user في التاريخ، نبدأ بتاريخ فارغ
+                historyForGemini = [];
+            }
+        }
+        
+        // إذا كان هناك system prompt وتاريخ فارغ، نضيف رسالة افتتاحية من المستخدم تحتوي على السياق
+        if (systemPrompt && historyForGemini.length === 0) {
+            historyForGemini.push({
+                role: 'user',
+                parts: [{ text: 'مرحباً' }]
+            });
+            historyForGemini.push({
+                role: 'model',
+                parts: [{ text: 'مرحباً! أنا مساعدك الذكي. كيف يمكنني مساعدتك؟' }]
+            });
+        }
+        
         // تحويل الأدوات إلى صيغة Gemini
         const geminiTools = tools.map(tool => ({
             functionDeclarations: [{
@@ -1017,16 +1053,43 @@ async function processWithGeminiAI(messages, tools) {
             }]
         }));
         
-        // إنشاء الدردشة
-        const chat = model.startChat({
-            history: conversationHistory.slice(0, -1), // كل الرسائل ماعدا الأخيرة
-            tools: geminiTools,
-            systemInstruction: systemPrompt
-        });
+        // إنشاء خيارات الدردشة بدون systemInstruction لتجنب الأخطاء
+        // سيتم دمج السياق في الرسائل بدلاً من ذلك
+        const chatOptions = {
+            history: historyForGemini,
+            tools: geminiTools
+        };
         
-        // إرسال آخر رسالة
+        // إنشاء الدردشة
+        const chat = model.startChat(chatOptions);
+        
+        // إرسال آخر رسالة - إذا كان هناك system prompt، نضيفه كسياق في الرسالة
         const lastMessage = conversationHistory[conversationHistory.length - 1];
-        const result = await chat.sendMessage(lastMessage.parts[0].text);
+        let messageToSend = lastMessage.parts[0].text;
+        
+        // إذا كان التاريخ فارغاً أو قصير والمستخدم يرسل رسالة، نضيف السياق والإرشادات للأدوات
+        if (systemPrompt && historyForGemini.length <= 2) {
+            messageToSend = `أنت مساعد ذكي للطلاب. تحدث بالعامية المصرية وكن ودوداً.
+
+معلومات مهمة - قواعد استخدام الأدوات:
+- **أنت المسؤول عن استخدام الأدوات** - لا تطلب من المستخدم استخدامها أبداً
+- **كن مستقلاً** - لا تسأل المستخدم عن المجلدات أو أسماء الملفات - ابحث بنفسك
+- استخدم analyze_config لرؤية المواد المتاحة
+- استخدم list_materials_folder لرؤية الملفات في مجلد معين
+- استخدم send_file لإرسال ملف واحد
+- استخدم send_folder لإرسال كل الملفات من مجلد
+- استخدم web_search للبحث في الإنترنت
+
+**خطة العمل الذكية:**
+1. إذا طلب المستخدم ملفات، ابحث أولاً باستخدام analyze_config
+2. إذا لم تجد، استخدم list_materials_folder لفحص المجلدات
+3. ابحث في مجلدات متعددة حتى تجد ما يريده المستخدم
+4. لا تخبر المستخدم بالخطوات - نفذها فقط وأرسل النتيجة
+
+السؤال: ${messageToSend}`;
+        }
+        
+        const result = await chat.sendMessage(messageToSend);
         const response = result.response;
         
         let finalResponse = {
@@ -1047,9 +1110,14 @@ async function processWithGeminiAI(messages, tools) {
             for (const call of functionCalls) {
                 const toolResult = await executeTool(call.name, call.args);
                 
+                // تنسيق الرد بشكل صحيح لـ Gemini
                 functionResponses.push({
-                    name: call.name,
-                    response: toolResult
+                    functionResponse: {
+                        name: call.name,
+                        response: {
+                            result: toolResult
+                        }
+                    }
                 });
                 
                 // حفظ نتيجة الأداة
@@ -1110,6 +1178,42 @@ export async function processWithGroqAI(userMessage, userId, userName = "الط�
         console.log(`\n🤖 Groq AI - معالجة رسالة من ${userName}`);
         console.log(`📝 الرسالة: ${userMessage}`);
         
+        // التحقق من رسائل الشكر/التقدير البسيطة بعد إرسال ملف
+        // نستخدم كلمة واحدة أو كلمتين فقط لتجنب الرسائل الطويلة
+        const messageTrimmed = userMessage.trim();
+        const wordCount = messageTrimmed.split(/\s+/).length;
+        const thankYouPatterns = /^(شكر.*|تسلم.*|ماشي|تمام|ok|thanks|thank you|thx|👍|🙏|❤️)$/i;
+        const isThankYouMessage = wordCount <= 2 && thankYouPatterns.test(messageTrimmed);
+        
+        // إذا كانت رسالة شكر بسيطة، نتحقق من آخر رد للبوت
+        if (isThankYouMessage) {
+            const context = getConversationContext(userId);
+            // إذا كان آخر رد من البوت يتضمن "تم إرسال الملف" فهذا يعني أن المستخدم يشكر على ملف تم إرساله
+            const lastBotMessage = context.length > 0 && context[context.length - 1].role === 'assistant' 
+                ? context[context.length - 1].content 
+                : '';
+            
+            if (lastBotMessage.includes('تم إرسال الملف') || lastBotMessage.includes('📚')) {
+                // رد بسيط بدون استخدام الـ AI ولا حفظ في الذاكرة لتجنب الهلوسة
+                const simpleResponses = [
+                    'العفو يا فندم! 😊',
+                    'ربنا يوفقك! 📚',
+                    'على الرحب والسعة! 🎓',
+                    'تمام، لو محتاج حاجة تانية أنا موجود! ✨'
+                ];
+                const randomResponse = simpleResponses[Math.floor(Math.random() * simpleResponses.length)];
+                
+                console.log('✅ رد تلقائي على رسالة شكر بعد إرسال ملف (بدون حفظ في الذاكرة)');
+                return {
+                    success: true,
+                    text: randomResponse,
+                    action: null,
+                    fileInfo: null,
+                    filesToSend: []
+                };
+            }
+        }
+        
         // إضافة رسالة المستخدم للذاكرة
         addToMemory(userId, "user", userMessage);
         
@@ -1124,7 +1228,7 @@ export async function processWithGroqAI(userMessage, userId, userName = "الط�
         
         // الطلب الأول للحصول على الرد
         let response = await groq.chat.completions.create({
-            model: "llama-3.3-70b-versatile", // النموذج المحدث - كان: "llama-3.1-70b-versatile"
+            model: "llama-3.3-70b-versatile", // النموذج النشط الحالي - ذكي جداً
             messages: messages,
             tools: tools,
             tool_choice: "auto",
@@ -1184,7 +1288,7 @@ export async function processWithGroqAI(userMessage, userId, userName = "الط�
             
             // طلب ثانٍ للحصول على الرد النهائي بعد تنفيذ الأدوات
             response = await groq.chat.completions.create({
-                model: "llama-3.3-70b-versatile", // النموذج المحدث
+                model: "llama-3.3-70b-versatile", // النموذج النشط الحالي - ذكي جداً
                 messages: messages,
                 temperature: 0.5, // تقليل للحد من الهلوسة
                 max_tokens: 800 // تقليل لتوفير التوكينز
@@ -1197,7 +1301,13 @@ export async function processWithGroqAI(userMessage, userId, userName = "الط�
         const botResponse = assistantMessage.content || "";
         
         // إضافة رد البوت للذاكرة
-        addToMemory(userId, "assistant", botResponse);
+        // إذا تم إرسال ملف، نحفظ نسخة مختصرة جداً في الذاكرة لتجنب الهلوسة
+        let responseToStore = botResponse;
+        if (finalResponse.action === 'send_file' || finalResponse.action === 'send_folder') {
+            // تقصير الرد لإزالة التفاصيل التي قد تسبب إعادة إرسال
+            responseToStore = "تمام، تم إرسال الملف المطلوب 📚";
+        }
+        addToMemory(userId, "assistant", responseToStore);
         
         finalResponse.text = botResponse;
         

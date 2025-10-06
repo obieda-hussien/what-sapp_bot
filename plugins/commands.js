@@ -57,6 +57,13 @@ import {
 
 import { readLastLines, cleanOldLogs, logCommand } from '../utils/logger.js';
 import { clearConversationMemory, getMemoryStats, isGroqEnabled } from '../utils/groqAssistant.js';
+import { 
+    canUseAutomaticReplies, 
+    canUseAI, 
+    getAccessControlInfo,
+    ACCESS_MODES 
+} from '../utils/accessControl.js';
+import { saveConfig } from '../utils/config.js';
 
 const COMMAND_PREFIX = '.';
 
@@ -328,6 +335,35 @@ export async function handleCommand(msg, sock, telegramBot) {
             case 'المشرفين':
             case 'admins':
                 return await handleListAdminsCommand();
+            
+            // أوامر التحكم في الوصول
+            case 'حظر_ردود':
+            case 'block_auto':
+                return await handleBlockAutoRepliesCommand(args);
+            
+            case 'الغاء_حظر_ردود':
+            case 'unblock_auto':
+                return await handleUnblockAutoRepliesCommand(args);
+            
+            case 'حظر_ai':
+            case 'block_ai':
+                return await handleBlockAICommand(args);
+            
+            case 'الغاء_حظر_ai':
+            case 'unblock_ai':
+                return await handleUnblockAICommand(args);
+            
+            case 'وضع_ردود':
+            case 'auto_mode':
+                return await handleSetAutoModeCommand(args);
+            
+            case 'وضع_ai':
+            case 'ai_mode':
+                return await handleSetAIModeCommand(args);
+            
+            case 'حالة_وصول':
+            case 'access_status':
+                return await handleAccessStatusCommand();
             
             default:
                 return {
@@ -941,6 +977,18 @@ async function handleHelpCommand() {
                   `• *.اضافة_مشرف* <رقم> - إضافة مشرف بصلاحيات محددة.\n` +
                   `• *.حذف_مشرف* <رقم> - إزالة مشرف.\n` +
                   `• *.المشرفين* - عرض قائمة المشرفين وصلاحياتهم.\n\n` +
+                  `*🔐 التحكم في الوصول:*\n` +
+                  `• *.حظر_ردود* <رقم> - حظر مستخدم من استخدام الردود الآلية.\n` +
+                  `  مثال: .حظر_ردود 201234567890\n` +
+                  `• *.الغاء_حظر_ردود* <رقم> - إلغاء حظر مستخدم من الردود الآلية.\n` +
+                  `• *.حظر_ai* <رقم> - حظر مستخدم من استخدام الذكاء الاصطناعي.\n` +
+                  `  مثال: .حظر_ai 201234567890\n` +
+                  `• *.الغاء_حظر_ai* <رقم> - إلغاء حظر مستخدم من الذكاء الاصطناعي.\n` +
+                  `• *.وضع_ردود* <الوضع> - تغيير وضع الردود الآلية (all/whitelist/blacklist).\n` +
+                  `  مثال: .وضع_ردود blacklist\n` +
+                  `• *.وضع_ai* <الوضع> - تغيير وضع الذكاء الاصطناعي (all/whitelist/blacklist).\n` +
+                  `  مثال: .وضع_ai whitelist\n` +
+                  `• *.حالة_وصول* - عرض حالة التحكم في الوصول الحالية.\n\n` +
                   `*🤖 Groq AI (الذكاء الاصطناعي):*\n` +
                   `• *.مسح_ذاكرة* - مسح ذاكرة المحادثة مع البوت (بدء محادثة جديدة).\n` +
                   `  استخدم: عند الحاجة لتغيير الموضوع أو البدء من جديد.\n` +
@@ -1538,6 +1586,292 @@ async function handleListAdminsCommand() {
         response += `${index + 1}. 👔 ${admin.phone}\n`;
         response += `   الصلاحيات: ${admin.permissions.join(', ')}\n\n`;
     });
+    
+    return {
+        handled: true,
+        response
+    };
+}
+
+/**
+ * أمر حظر مستخدم من الردود الآلية
+ */
+async function handleBlockAutoRepliesCommand(args) {
+    if (args.length === 0) {
+        return {
+            handled: true,
+            response: '❌ الاستخدام: .حظر_ردود <رقم_الهاتف>\nمثال: .حظر_ردود 201234567890'
+        };
+    }
+    
+    const phone = args[0].trim();
+    const config = loadConfig();
+    
+    if (!config.accessControl) {
+        config.accessControl = {
+            automaticReplies: { mode: 'all', blockedUsers: [], allowedUsers: [] },
+            aiResponses: { mode: 'all', blockedUsers: [], allowedUsers: [] }
+        };
+    }
+    
+    if (!config.accessControl.automaticReplies.blockedUsers.includes(phone)) {
+        config.accessControl.automaticReplies.blockedUsers.push(phone);
+        saveConfig(config);
+        
+        return {
+            handled: true,
+            response: `✅ تم حظر ${phone} من استخدام الردود الآلية\n\n💡 لتفعيل وضع القائمة السوداء، استخدم:\n.وضع_ردود blacklist`
+        };
+    } else {
+        return {
+            handled: true,
+            response: `⚠️ المستخدم ${phone} محظور بالفعل من الردود الآلية`
+        };
+    }
+}
+
+/**
+ * أمر إلغاء حظر مستخدم من الردود الآلية
+ */
+async function handleUnblockAutoRepliesCommand(args) {
+    if (args.length === 0) {
+        return {
+            handled: true,
+            response: '❌ الاستخدام: .الغاء_حظر_ردود <رقم_الهاتف>\nمثال: .الغاء_حظر_ردود 201234567890'
+        };
+    }
+    
+    const phone = args[0].trim();
+    const config = loadConfig();
+    
+    if (!config.accessControl || !config.accessControl.automaticReplies) {
+        return {
+            handled: true,
+            response: '⚠️ لا يوجد مستخدمين محظورين'
+        };
+    }
+    
+    const index = config.accessControl.automaticReplies.blockedUsers.indexOf(phone);
+    if (index > -1) {
+        config.accessControl.automaticReplies.blockedUsers.splice(index, 1);
+        saveConfig(config);
+        
+        return {
+            handled: true,
+            response: `✅ تم إلغاء حظر ${phone} من الردود الآلية`
+        };
+    } else {
+        return {
+            handled: true,
+            response: `⚠️ المستخدم ${phone} غير محظور من الردود الآلية`
+        };
+    }
+}
+
+/**
+ * أمر حظر مستخدم من الذكاء الاصطناعي
+ */
+async function handleBlockAICommand(args) {
+    if (args.length === 0) {
+        return {
+            handled: true,
+            response: '❌ الاستخدام: .حظر_ai <رقم_الهاتف>\nمثال: .حظر_ai 201234567890'
+        };
+    }
+    
+    const phone = args[0].trim();
+    const config = loadConfig();
+    
+    if (!config.accessControl) {
+        config.accessControl = {
+            automaticReplies: { mode: 'all', blockedUsers: [], allowedUsers: [] },
+            aiResponses: { mode: 'all', blockedUsers: [], allowedUsers: [] }
+        };
+    }
+    
+    if (!config.accessControl.aiResponses.blockedUsers.includes(phone)) {
+        config.accessControl.aiResponses.blockedUsers.push(phone);
+        saveConfig(config);
+        
+        return {
+            handled: true,
+            response: `✅ تم حظر ${phone} من استخدام الذكاء الاصطناعي\n\n💡 لتفعيل وضع القائمة السوداء، استخدم:\n.وضع_ai blacklist`
+        };
+    } else {
+        return {
+            handled: true,
+            response: `⚠️ المستخدم ${phone} محظور بالفعل من الذكاء الاصطناعي`
+        };
+    }
+}
+
+/**
+ * أمر إلغاء حظر مستخدم من الذكاء الاصطناعي
+ */
+async function handleUnblockAICommand(args) {
+    if (args.length === 0) {
+        return {
+            handled: true,
+            response: '❌ الاستخدام: .الغاء_حظر_ai <رقم_الهاتف>\nمثال: .الغاء_حظر_ai 201234567890'
+        };
+    }
+    
+    const phone = args[0].trim();
+    const config = loadConfig();
+    
+    if (!config.accessControl || !config.accessControl.aiResponses) {
+        return {
+            handled: true,
+            response: '⚠️ لا يوجد مستخدمين محظورين'
+        };
+    }
+    
+    const index = config.accessControl.aiResponses.blockedUsers.indexOf(phone);
+    if (index > -1) {
+        config.accessControl.aiResponses.blockedUsers.splice(index, 1);
+        saveConfig(config);
+        
+        return {
+            handled: true,
+            response: `✅ تم إلغاء حظر ${phone} من الذكاء الاصطناعي`
+        };
+    } else {
+        return {
+            handled: true,
+            response: `⚠️ المستخدم ${phone} غير محظور من الذكاء الاصطناعي`
+        };
+    }
+}
+
+/**
+ * أمر تغيير وضع الردود الآلية
+ */
+async function handleSetAutoModeCommand(args) {
+    if (args.length === 0) {
+        return {
+            handled: true,
+            response: '❌ الاستخدام: .وضع_ردود <الوضع>\n\nالأوضاع المتاحة:\n• all - الكل (افتراضي)\n• whitelist - قائمة بيضاء (فقط المسموح لهم)\n• blacklist - قائمة سوداء (الكل ما عدا المحظورين)\n\nمثال: .وضع_ردود blacklist'
+        };
+    }
+    
+    const mode = args[0].toLowerCase().trim();
+    const validModes = ['all', 'whitelist', 'blacklist'];
+    
+    if (!validModes.includes(mode)) {
+        return {
+            handled: true,
+            response: `❌ وضع غير صحيح: ${mode}\n\nالأوضاع الصحيحة: all, whitelist, blacklist`
+        };
+    }
+    
+    const config = loadConfig();
+    
+    if (!config.accessControl) {
+        config.accessControl = {
+            automaticReplies: { mode: 'all', blockedUsers: [], allowedUsers: [] },
+            aiResponses: { mode: 'all', blockedUsers: [], allowedUsers: [] }
+        };
+    }
+    
+    config.accessControl.automaticReplies.mode = mode;
+    saveConfig(config);
+    
+    let modeText = mode === 'all' ? 'الكل يمكنه الوصول' : 
+                   mode === 'whitelist' ? 'قائمة بيضاء (فقط المسموح لهم)' : 
+                   'قائمة سوداء (الكل ما عدا المحظورين)';
+    
+    return {
+        handled: true,
+        response: `✅ تم تغيير وضع الردود الآلية إلى: ${modeText}\n\n💡 لإضافة مستخدمين:\n• للحظر: .حظر_ردود <رقم>\n• للسماح (whitelist): أضف للقائمة البيضاء في config.json`
+    };
+}
+
+/**
+ * أمر تغيير وضع الذكاء الاصطناعي
+ */
+async function handleSetAIModeCommand(args) {
+    if (args.length === 0) {
+        return {
+            handled: true,
+            response: '❌ الاستخدام: .وضع_ai <الوضع>\n\nالأوضاع المتاحة:\n• all - الكل (افتراضي)\n• whitelist - قائمة بيضاء (فقط المسموح لهم)\n• blacklist - قائمة سوداء (الكل ما عدا المحظورين)\n\nمثال: .وضع_ai blacklist'
+        };
+    }
+    
+    const mode = args[0].toLowerCase().trim();
+    const validModes = ['all', 'whitelist', 'blacklist'];
+    
+    if (!validModes.includes(mode)) {
+        return {
+            handled: true,
+            response: `❌ وضع غير صحيح: ${mode}\n\nالأوضاع الصحيحة: all, whitelist, blacklist`
+        };
+    }
+    
+    const config = loadConfig();
+    
+    if (!config.accessControl) {
+        config.accessControl = {
+            automaticReplies: { mode: 'all', blockedUsers: [], allowedUsers: [] },
+            aiResponses: { mode: 'all', blockedUsers: [], allowedUsers: [] }
+        };
+    }
+    
+    config.accessControl.aiResponses.mode = mode;
+    saveConfig(config);
+    
+    let modeText = mode === 'all' ? 'الكل يمكنه الوصول' : 
+                   mode === 'whitelist' ? 'قائمة بيضاء (فقط المسموح لهم)' : 
+                   'قائمة سوداء (الكل ما عدا المحظورين)';
+    
+    return {
+        handled: true,
+        response: `✅ تم تغيير وضع الذكاء الاصطناعي إلى: ${modeText}\n\n💡 لإضافة مستخدمين:\n• للحظر: .حظر_ai <رقم>\n• للسماح (whitelist): أضف للقائمة البيضاء في config.json`
+    };
+}
+
+/**
+ * أمر عرض حالة التحكم في الوصول
+ */
+async function handleAccessStatusCommand() {
+    const accessInfo = getAccessControlInfo();
+    
+    let autoModeText = accessInfo.automaticReplies.mode === 'all' ? '🌐 الكل' :
+                       accessInfo.automaticReplies.mode === 'whitelist' ? '📋 قائمة بيضاء' :
+                       '🚫 قائمة سوداء';
+    
+    let aiModeText = accessInfo.aiResponses.mode === 'all' ? '🌐 الكل' :
+                     accessInfo.aiResponses.mode === 'whitelist' ? '📋 قائمة بيضاء' :
+                     '🚫 قائمة سوداء';
+    
+    let response = '🔐 حالة التحكم في الوصول:\n\n';
+    
+    response += '📱 الردود الآلية:\n';
+    response += `   الوضع: ${autoModeText}\n`;
+    response += `   المحظورين: ${accessInfo.automaticReplies.blockedCount}\n`;
+    response += `   المسموح لهم: ${accessInfo.automaticReplies.allowedCount}\n\n`;
+    
+    response += '🤖 الذكاء الاصطناعي:\n';
+    response += `   الوضع: ${aiModeText}\n`;
+    response += `   المحظورين: ${accessInfo.aiResponses.blockedCount}\n`;
+    response += `   المسموح لهم: ${accessInfo.aiResponses.allowedCount}\n\n`;
+    
+    if (accessInfo.automaticReplies.blockedUsers.length > 0) {
+        response += '🚫 المحظورين من الردود الآلية:\n';
+        accessInfo.automaticReplies.blockedUsers.forEach((phone, idx) => {
+            response += `   ${idx + 1}. ${phone}\n`;
+        });
+        response += '\n';
+    }
+    
+    if (accessInfo.aiResponses.blockedUsers.length > 0) {
+        response += '🚫 المحظورين من الذكاء الاصطناعي:\n';
+        accessInfo.aiResponses.blockedUsers.forEach((phone, idx) => {
+            response += `   ${idx + 1}. ${phone}\n`;
+        });
+        response += '\n';
+    }
+    
+    response += '💡 للمزيد من المساعدة، استخدم .المساعدة';
     
     return {
         handled: true,
