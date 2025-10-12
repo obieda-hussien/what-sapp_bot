@@ -432,7 +432,7 @@ function searchMaterialsFolder(query) {
 /**
  * الحصول على قائمة شاملة بجميع الملفات المتاحة
  */
-function listAllMaterials() {
+export function listAllMaterials() {
     try {
         const materialsPath = path.join(__dirname, '..', 'Materials');
         
@@ -618,7 +618,7 @@ function findFileInConfig(query) {
 /**
  * الحصول على جميع الملفات من مجلد معين
  */
-function getAllFilesFromFolder(folderPath) {
+export function getAllFilesFromFolder(folderPath) {
     try {
         const materialsPath = path.join(__dirname, '..', 'Materials');
         const fullPath = path.join(materialsPath, folderPath);

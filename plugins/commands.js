@@ -56,7 +56,7 @@ import {
 } from './reports.js';
 
 import { readLastLines, cleanOldLogs, logCommand } from '../utils/logger.js';
-import { clearConversationMemory, getMemoryStats, isGroqEnabled } from '../utils/groqAssistant.js';
+import { clearConversationMemory, getMemoryStats, isGroqEnabled, listAllMaterials, getAllFilesFromFolder } from '../utils/groqAssistant.js';
 import { 
     canUseAutomaticReplies, 
     canUseAI, 
@@ -365,6 +365,10 @@ export async function handleCommand(msg, sock, telegramBot) {
             case 'access_status':
                 return await handleAccessStatusCommand();
             
+            case 'ملفات':
+            case 'files':
+                return await handleListFilesCommand(args, sock, senderJid);
+
             default:
                 return {
                     handled: true,
@@ -442,6 +446,85 @@ async function handleStatusCommand() {
     return {
         handled: true,
         response
+    };
+}
+
+/**
+ * أمر عرض الملفات والمجلدات وإرسالها
+ */
+async function handleListFilesCommand(args, sock, senderJid) {
+    const folderPath = args.join(' ');
+
+    // إذا لم يتم تقديم مسار، نعرض قائمة الملفات
+    if (!folderPath) {
+        const materialsData = listAllMaterials();
+
+        if (materialsData.total === 0) {
+            return {
+                handled: true,
+                response: '🗂️ لا توجد أي ملفات في مجلد Materials حالياً.'
+            };
+        }
+
+        let response = `لدي إجمالي ${materialsData.total} ملف:\n\n`;
+
+        Object.keys(materialsData.categories).forEach(category => {
+            const files = materialsData.categories[category];
+            response += `📁 ${category}: ${files.length} ملف\n`;
+            files.forEach((file, index) => {
+                response += `   ${index + 1}. ${file.name}\n`;
+            });
+            response += '\n';
+        });
+
+        response += '💡 لإرسال مجلد كامل، استخدم:\n.ملفات <مسار_المجلد>';
+
+        return {
+            handled: true,
+            response
+        };
+    }
+
+    // إذا تم تقديم مسار، نحاول إرسال الملفات
+    await sock.sendMessage(senderJid, { text: `⏳ جاري تحضير ملفات مجلد "${folderPath}"...` });
+
+    const folderResult = getAllFilesFromFolder(folderPath);
+
+    if (!folderResult.success || folderResult.files.length === 0) {
+        return {
+            handled: true,
+            response: `❌ لم أتمكن من العثور على المجلد "${folderPath}" أو أنه فارغ.`
+        };
+    }
+
+    await sock.sendMessage(senderJid, { text: `✅ تم العثور على ${folderResult.count} ملف. سأقوم بإرسالها الآن...` });
+
+    for (const file of folderResult.files) {
+        try {
+            if (file.fileType === 'image') {
+                await sock.sendMessage(senderJid, {
+                    image: { url: file.filePath },
+                    caption: file.caption || ''
+                });
+            } else {
+                await sock.sendMessage(senderJid, {
+                    document: { url: file.filePath },
+                    mimetype: 'application/octet-stream',
+                    fileName: file.fileName,
+                    caption: file.caption || ''
+                });
+            }
+            // تأخير بسيط بين الرسائل
+            await new Promise(resolve => setTimeout(resolve, 500));
+        } catch (error) {
+            console.error(`❌ فشل إرسال الملف: ${file.fileName}`, error);
+            await sock.sendMessage(senderJid, { text: `⚠️ فشل إرسال الملف: ${file.fileName}` });
+        }
+    }
+
+    return {
+        handled: true,
+        response: `✅ تم إرسال جميع ملفات مجلد "${folderPath}" بنجاح!`
     };
 }
 
@@ -922,6 +1005,9 @@ async function handleHelpCommand() {
                   `• *.الحالة* - عرض تقرير مفصل عن حالة البوت والجسور.\n` +
                   `• *.ايقاف_مؤقت* - إيقاف نقل الرسائل من المجموعة الحالية فقط.\n` +
                   `• *.استئناف* - استئناف نقل الرسائل من المجموعة الحالية.\n\n` +
+                  `*📂 إدارة الملفات:*\n` +
+                  `• *.ملفات* - عرض جميع الملفات والمجلدات المتاحة.\n` +
+                  `• *.ملفات* <مسار المجلد> - إرسال جميع ملفات مجلد معين.\n\n` +
                   `*📢 إدارة الجسور (القنوات):*\n` +
                   `• *.اضافة_قناة* <ID المجموعة> <ID القناة> - لربط مجموعة واتساب بقناة تليجرام.\n` +
                   `• *.حذف_قناة* <ID المجموعة> - لحذف ربط معين.\n` +
