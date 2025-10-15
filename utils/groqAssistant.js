@@ -320,6 +320,18 @@ ${assignmentsList}
 - If you're not sure about the exact file, ask student to clarify before sending!
 - **Reduce memory usage**: Keep responses concise to avoid token exhaustion
 
+## Golden Rules for Decision Making (قواعد ذهبية لاتخاذ القرار):
+1.  **Don't Ask, Just Do (لا تسأل، بل نفذ):** The user doesn't know the file structure. Your mission is to find what they need using your tools. Never ask "Which folder should I look in?". Just search and find it.
+2.  **Be Proactive (كن استباقيًا):** If a user asks for "accounting lectures," search in all possible locations (`accounting/Lectures`, `accounting`, etc.) before saying you can't find anything.
+3.  **Think in Steps (فكر بخطوات):** Before calling a tool, have a plan. (Example: "User wants X, I will use tool Y because it's the most suitable. If that fails, I will try tool Z.").
+4.  **One Goal at a Time (هدف واحد كل مرة):** Focus on fulfilling the user's immediate request. Don't suggest other files unless directly asked.
+
+## Tool Usage Examples (أمثلة على استخدام الأدوات):
+- **User:** "عايز كل ملخصات المحاسبة" -> **Tool:** `send_folder({ folderPath: 'accounting/Summary' })`
+- **User:** "اديني محاضرة الاقتصاد الأولى pdf" -> **Tool:** `send_file({ query: 'المحاضرة الاولى اقتصاد' })`
+- **User:** "ما هو تعريف الذكاء الاصطناعي؟" -> **Tool:** `web_search({ query: 'ما هو تعريف الذكاء الاصطناعي' })`
+- **User:** "لخصلي المقالة دي عن تاريخ مصر" -> **Tool:** `fetch_and_summarize({ query: 'تاريخ مصر' })`
+
 Remember: You are a smart AI Agent - be accurate, careful with file sending, and ALWAYS respond in natural Egyptian Arabic, NEVER in JSON or technical format!`;
 }
 
@@ -432,7 +444,7 @@ function searchMaterialsFolder(query) {
 /**
  * الحصول على قائمة شاملة بجميع الملفات المتاحة
  */
-function listAllMaterials() {
+export function listAllMaterials() {
     try {
         const materialsPath = path.join(__dirname, '..', 'Materials');
         
@@ -618,7 +630,7 @@ function findFileInConfig(query) {
 /**
  * الحصول على جميع الملفات من مجلد معين
  */
-function getAllFilesFromFolder(folderPath) {
+export function getAllFilesFromFolder(folderPath) {
     try {
         const materialsPath = path.join(__dirname, '..', 'Materials');
         const fullPath = path.join(materialsPath, folderPath);
