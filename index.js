@@ -71,7 +71,8 @@ const FORWARD_MESSAGE_EDITS = process.env.FORWARD_MESSAGE_EDITS !== 'false';
 const telegramBot = new Telegraf(TELEGRAM_BOT_TOKEN);
 const logger = pino({ level: 'info' });
 const msgRetryCounterCache = new NodeCache();
-const messageCache = new NodeCache({ stdTTL: 86400 });
+const messageCache = new NodeCache({ stdTTL: 86400 }); // تخزين message IDs من Telegram
+const processedMessages = new NodeCache({ stdTTL: 3600 }); // تخزين الرسائل المعالجة لمنع التكرار (1 ساعة)
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 const question = (text) => new Promise((resolve) => rl.question(text, resolve));
 
@@ -193,39 +194,67 @@ async function handleNewMessage(msg) {
     const messageId = msg.key.id;
     const senderPhone = msg.key.participant?.split('@')[0] || msg.key.remoteJid?.split('@')[0];
     
-    // استخراج نوع الرسالة مع تجاهل الرسائل البروتوكولية
-    const messageKeys = Object.keys(msg.message);
-    const protocolMessages = [
-        'senderKeyDistributionMessage', 
-        'messageContextInfo',
-        'associatedChildMessage',  // رسالة مرتبطة - تظهر مع الردود على الوسائط
-        'editedMessage'  // معلومات عن الرسالة المعدلة - تُعالج في handleMessageUpdate
-    ];
-    const actualMessageKey = messageKeys.find(key => !protocolMessages.includes(key));
-    
-    if (!actualMessageKey) {
-        return; // رسالة بروتوكولية فقط
+    // ✨ منع معالجة الرسائل المكررة - حماية قوية ضد الإرسال المزدوج
+    // التحقق من أن الرسالة لم تتم معالجتها من قبل
+    const messageKey = `${groupJid}_${messageId}`;
+    if (processedMessages.has(messageKey)) {
+        console.log(`⚠️ تم تجاهل رسالة مكررة من ${senderName} (ID: ${messageId})`);
+        return;
     }
     
-    const messageType = actualMessageKey;
-    const messageContent = msg.message[messageType];
+    // وضع علامة على أن الرسالة قيد المعالجة لمنع المعالجة المتزامنة
+    processedMessages.set(messageKey, {
+        timestamp: Date.now(),
+        senderName: senderName,
+        processed: false
+    });
     
-    // معالجة الأوامر من أي محادثة (جروب، خاص، إلخ)
-    const text = messageContent.text || messageContent;
-    if (typeof text === 'string' && isCommand(text)) {
-        console.log(`\n📨 رسالة جديدة من ${senderName} (ID: ${messageId})`);
-        console.log(`⚡ تم اكتشاف أمر: ${text}`);
+    try {
+        // استخراج نوع الرسالة مع تجاهل الرسائل البروتوكولية
+        const messageKeys = Object.keys(msg.message);
+        const protocolMessages = [
+            'senderKeyDistributionMessage', 
+            'messageContextInfo',
+            'associatedChildMessage',  // رسالة مرتبطة - تظهر مع الردود على الوسائط
+            'editedMessage'  // معلومات عن الرسالة المعدلة - تُعالج في handleMessageUpdate
+        ];
+        const actualMessageKey = messageKeys.find(key => !protocolMessages.includes(key));
         
-        const result = await handleCommand(msg, sock, telegramBot);
-        if (result && result.handled && result.response) {
-            // إرسال الرد على WhatsApp في نفس المحادثة
-            await sock.sendMessage(groupJid, { text: result.response });
-            console.log('✅ تم إرسال رد الأمر');
-        } else if (result && result.handled) {
-            console.log('✅ تم معالجة الأمر بدون رد');
+        if (!actualMessageKey) {
+            // رسالة بروتوكولية فقط - نحذفها من الـ cache
+            processedMessages.del(messageKey);
+            return;
         }
-        return; // لا نقوم بنقل الأوامر إلى Telegram
-    }
+    
+        const messageType = actualMessageKey;
+        const messageContent = msg.message[messageType];
+        let textContent = ''; // للاستخدام في catch block
+    
+        // معالجة الأوامر من أي محادثة (جروب، خاص، إلخ)
+        const text = messageContent.text || messageContent;
+        if (typeof text === 'string' && isCommand(text)) {
+            console.log(`\n📨 رسالة جديدة من ${senderName} (ID: ${messageId})`);
+            console.log(`⚡ تم اكتشاف أمر: ${text}`);
+            
+            const result = await handleCommand(msg, sock, telegramBot);
+            if (result && result.handled && result.response) {
+                // إرسال الرد على WhatsApp في نفس المحادثة
+                await sock.sendMessage(groupJid, { text: result.response });
+                console.log('✅ تم إرسال رد الأمر');
+            } else if (result && result.handled) {
+                console.log('✅ تم معالجة الأمر بدون رد');
+            }
+            
+            // وضع علامة على أن الأمر تمت معالجته
+            processedMessages.set(messageKey, {
+                timestamp: Date.now(),
+                senderName: senderName,
+                processed: true,
+                messageType: 'command'
+            });
+            
+            return; // لا نقوم بنقل الأوامر إلى Telegram
+        }
     
     // دعم الجسور المتعددة - التحقق من أي جروب مسجل
     const config = loadConfig();
@@ -484,54 +513,65 @@ async function handleNewMessage(msg) {
         } else {
             console.log('⚠️ الرسالة ليست نصية');
         }
+        
+        // وضع علامة على أن رسالة المحادثة الخاصة تمت معالجتها
+        processedMessages.set(messageKey, {
+            timestamp: Date.now(),
+            senderName: senderName,
+            processed: true,
+            messageType: 'privateChat'
+        });
+        
         return; // لا نقوم بنقل المحادثات الخاصة إلى Telegram
     }
     
     // إذا لم تكن الرسالة من جروب مراقب، نتجاهلها (ما عدا الأوامر)
-    if (!isFromMonitoredGroup) return;
+    if (!isFromMonitoredGroup) {
+        // وضع علامة على الرسالة كمعالجة (متجاهلة لأنها ليست من جروب مراقب)
+        processedMessages.set(messageKey, {
+            timestamp: Date.now(),
+            senderName: senderName,
+            processed: true,
+            messageType: 'ignored_not_monitored'
+        });
+        return;
+    }
     
     console.log(`\n📨 رسالة جديدة من ${senderName} (ID: ${messageId})`);
 
-    // متغير لحفظ محتوى النص للاستخدام في catch block
-    let textContent = '';
+    // التحقق من حالة البوت
+    if (!isBotActive()) {
+        console.log('⏸️ البوت متوقف - تم تجاهل الرسالة');
+        return;
+    }
 
-    try {
-        // التحقق من حالة البوت
-        if (!isBotActive()) {
-            console.log('⏸️ البوت متوقف - تم تجاهل الرسالة');
-            return;
-        }
+    // التحقق من حالة الجروب
+    if (isGroupPaused(groupJid)) {
+        console.log('⏸️ الجروب متوقف مؤقتاً - تم تجاهل الرسالة');
+        return;
+    }
 
-        // التحقق من حالة الجروب
-        if (isGroupPaused(groupJid)) {
-            console.log('⏸️ الجروب متوقف مؤقتاً - تم تجاهل الرسالة');
-            return;
-        }
+    // تطبيق الفلاتر
+    if (shouldFilterMessage(senderPhone, text, messageType)) {
+        console.log('🔍 تم فلترة الرسالة');
+        return;
+    }
 
-        // إعادة تحديد text للرسائل غير الأوامر
-        const text = messageContent.text || messageContent;
-        
-        // تطبيق الفلاتر
-        if (shouldFilterMessage(senderPhone, text, messageType)) {
-            console.log('🔍 تم فلترة الرسالة');
-            return;
-        }
-
-        // تحديد القناة المستهدفة
-        const config = loadConfig();
-        let targetChannel = TELEGRAM_CHANNEL_ID;
+    // تحديد القناة المستهدفة
+    // config already loaded earlier, reusing it
+    let targetChannel = TELEGRAM_CHANNEL_ID;
+    if (!targetChannel) {
+        targetChannel = getTelegramChannel(groupJid);
         if (!targetChannel) {
-            targetChannel = getTelegramChannel(groupJid);
-            if (!targetChannel) {
-                logWarning(`لا توجد قناة مرتبطة بالجروب: ${groupJid}`);
-                console.log('⚠️ لا توجد قناة مرتبطة بهذا الجروب');
-                return;
-            }
+            logWarning(`لا توجد قناة مرتبطة بالجروب: ${groupJid}`);
+            console.log('⚠️ لا توجد قناة مرتبطة بهذا الجروب');
+            return;
         }
+    }
 
-        // تسجيل رسالة واتساب وحفظ محتوى النص
-        textContent = typeof text === 'string' ? text : JSON.stringify(messageContent).substring(0, 100);
-        logWhatsAppMessage(senderName, senderPhone, groupJid, messageType, textContent);
+    // تسجيل رسالة واتساب وحفظ محتوى النص
+    textContent = typeof text === 'string' ? text : JSON.stringify(messageContent).substring(0, 100);
+    logWhatsAppMessage(senderName, senderPhone, groupJid, messageType, textContent);
 
         // استخراج معلومات إضافية
         const replyInfo = getQuotedInfo(msg);
@@ -849,10 +889,32 @@ async function handleNewMessage(msg) {
                 logWarning(`نوع رسالة غير مدعوم: ${messageType} من ${senderName}`);
                 break;
         }
+        
+        // ✅ وضع علامة على أن الرسالة تمت معالجتها بنجاح
+        processedMessages.set(messageKey, {
+            timestamp: Date.now(),
+            senderName: senderName,
+            processed: true,
+            messageType: messageType
+        });
+        
     } catch (error) {
         console.error('❌ خطأ في معالجة الرسالة:', error.message);
         logError(`خطأ في معالجة رسالة من ${senderName}`, error);
-        logFailedTransfer(senderName, senderPhone, messageType, error.message, textContent);
+        
+        // في حالة الخطأ، نضع علامة على أن الرسالة تمت معالجتها (فشلت)
+        // لمنع إعادة المحاولة التي قد تسبب رسائل مكررة
+        processedMessages.set(messageKey, {
+            timestamp: Date.now(),
+            senderName: senderName,
+            processed: true,
+            error: error.message
+        });
+        
+        // تسجيل الفشل إذا كان messageType معرف
+        if (typeof messageType !== 'undefined') {
+            logFailedTransfer(senderName, senderPhone, messageType, error.message, textContent || '');
+        }
     }
 }
 
