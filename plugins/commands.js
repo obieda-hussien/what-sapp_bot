@@ -534,6 +534,12 @@ async function handleListChannelsCommand() {
  * البحث عن LID للمستخدم من الجروبات
  */
 async function findUserLID(sock, phoneNumber) {
+    // التحقق من حالة الاتصال أولاً
+    if (sock.ws.readyState !== 1) {
+        console.log('⚠️ لا يمكن البحث عن LID لأن البوت غير متصل.');
+        return null;
+    }
+
     try {
         // البحث في جميع الجروبات
         const groups = await sock.groupFetchAllParticipating();
@@ -575,6 +581,15 @@ async function handleAddEliteCommand(args, sock) {
         };
     }
     
+    // التحقق من حالة الاتصال إذا كنا سنبحث عن LID
+    const willSearchForLid = args.some(arg => !arg.includes('@lid'));
+    if (willSearchForLid && sock.ws.readyState !== 1) {
+        return {
+            handled: true,
+            response: '⚠️ عذراً، لا يمكن جلب LID تلقائياً لأن البوت غير متصل بالإنترنت حالياً.\n\n💡 يمكنك محاولة إضافة المستخدم مع LID يدوياً إذا كان معروفاً.'
+        };
+    }
+
     const addedItems = [];
     let phoneAdded = false;
     let lidAdded = false;

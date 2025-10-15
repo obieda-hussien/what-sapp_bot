@@ -680,6 +680,79 @@ async function handleNewMessage(msg) {
                 console.log('✅ تم إرسال الملصق إلى Telegram');
                 break;
 
+            case 'albumMessage': {
+                console.log('🖼️ Album message received');
+                const albumMessages = messageContent.messages;
+                const mediaGroup = [];
+                let caption = messageContent.caption || '';
+
+                // First, find a caption from any of the messages in the album
+                if (!caption) {
+                    for (const albumMsg of albumMessages) {
+                        const itemCaption = albumMsg.message?.imageMessage?.caption || albumMsg.message?.videoMessage?.caption;
+                        if (itemCaption) {
+                            caption = itemCaption;
+                            break;
+                        }
+                    }
+                }
+
+                for (const albumMsg of albumMessages) {
+                    const itemType = Object.keys(albumMsg.message)[0];
+                    let buffer;
+                    let type;
+
+                    try {
+                        buffer = await downloadMediaMessage(albumMsg, 'buffer', {}, {
+                            logger,
+                            reuploadRequest: sock.updateMediaMessage
+                        });
+                    } catch (downloadError) {
+                        logError(`Failed to download album item for message ${messageId}`, downloadError);
+                        console.error('❌ Failed to download album item:', downloadError);
+                        continue;
+                    }
+
+                    if (itemType === 'imageMessage') {
+                        type = 'photo';
+                    } else if (itemType === 'videoMessage') {
+                        type = 'video';
+                    } else {
+                        logWarning(`Unsupported message type in album: ${itemType}`);
+                        continue;
+                    }
+
+                    mediaGroup.push({
+                        type,
+                        media: { source: buffer }
+                    });
+                }
+
+                if (mediaGroup.length > 0) {
+                    try {
+                        const finalCaption = buildCaption(senderName, caption, '🖼️') + replyInfo + mentionInfo;
+                        // Assign the caption to the first element only
+                        mediaGroup[0].caption = finalCaption;
+                        mediaGroup[0].parse_mode = 'Markdown';
+
+                        const sentMessages = await telegramBot.telegram.sendMediaGroup(targetChannel, mediaGroup);
+                        sentMessages.forEach((sentMsg, index) => {
+                            // Cache the first message ID to allow for deletion and replies
+                            if (index === 0) {
+                                messageCache.set(messageId, sentMsg.message_id);
+                            }
+                        });
+                        logTelegramMessage(targetChannel, 'album', true, messageCache.get(messageId));
+                        console.log(`✅ تم إرسال الألبوم (${mediaGroup.length} عناصر) إلى Telegram`);
+                    } catch (error) {
+                        logFailedTransfer(senderName, senderPhone, 'album', error.message, `Album with ${mediaGroup.length} items`);
+                        logError(`Failed to send album to Telegram for message ${messageId}`, error);
+                        console.error('❌ Failed to send album to Telegram:', error);
+                    }
+                }
+                break;
+            }
+
             case 'pollCreationMessage':
             case 'pollCreationMessageV2':
             case 'pollCreationMessageV3':
