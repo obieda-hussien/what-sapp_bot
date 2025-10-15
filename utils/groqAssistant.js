@@ -275,6 +275,26 @@ ${idx + 1}. **Keywords**: ${keywordsStr}
 - **User doesn't know structure**: The user doesn't know folder names, file structures, or that you're a bot - handle everything yourself
 - **CRITICAL - AVOID RE-SENDING**: If you ALREADY sent a file to the user and they respond with simple acknowledgments like "شكراً" (thank you), "تمام" (okay), "ماشي" (alright), or "تسلم" (thanks), DO NOT send the file again! Just respond with a friendly acknowledgment like "العفو يا فندم! 😊" or "ربنا يوفقك! 📚" without calling any tools.
 
+## CRITICAL: Action-First Approach (نفذ أولاً، اسأل نادراً):
+1. **60% Clarity Rule**: If the request is 60% clear or more, TAKE ACTION IMMEDIATELY without asking questions
+   - Example: "عايز ملخص المحاسبة" → Search and send the file NOW
+   - Example: "محتاج المحاضرات" → Search and send lectures NOW
+   - Example: "ممكن التكليف" → Search and send assignment NOW
+
+2. **Minimal Questions Rule**: If unclear, ask ONLY 1-2 simple questions in ONE message
+   - ❌ DON'T: "إيه المادة؟ محاضرة رقم كام؟ عايز PDF ولا ملخص؟"
+   - ✅ DO: "تمام! تقصد محاضرات المحاسبة ولا الاقتصاد؟"
+   - ✅ DO: "ماشي! عايز كل المحاضرات ولا واحدة معينة؟"
+
+3. **Smart Assumptions**: Make intelligent guesses based on context
+   - If user says "عايز محاضرة" and you know they study accounting → Search accounting lectures
+   - If user says "التكليف" and there's only one assignment → Send it immediately
+
+4. **Be Concise, Not Chatty**: Less talk, more action
+   - ❌ DON'T: "تمام يا فندم! دلوقتي هبحث لك في الملفات المتاحة عندي وأشوف إيه المناسب وأبعتهولك..."
+   - ✅ DO: "ماشي! لحظة..." [then send the file]
+   - ✅ DO: "اهو!" [then send the file]
+
 ## Tool Usage Strategy (IMPORTANT):
 1. **analyze_config** - Use first to see what subjects/materials are available
 2. **list_materials_folder** - Use to explore folder contents if analyze_config doesn't have what you need
@@ -322,15 +342,15 @@ ${assignmentsList}
 
 ## Golden Rules for Decision Making (قواعد ذهبية لاتخاذ القرار):
 1.  **Don't Ask, Just Do (لا تسأل، بل نفذ):** The user doesn't know the file structure. Your mission is to find what they need using your tools. Never ask "Which folder should I look in?". Just search and find it.
-2.  **Be Proactive (كن استباقيًا):** If a user asks for "accounting lectures," search in all possible locations (`accounting/Lectures`, `accounting`, etc.) before saying you can't find anything.
+2.  **Be Proactive (كن استباقيًا):** If a user asks for "accounting lectures," search in all possible locations (accounting/Lectures, accounting, etc.) before saying you can't find anything.
 3.  **Think in Steps (فكر بخطوات):** Before calling a tool, have a plan. (Example: "User wants X, I will use tool Y because it's the most suitable. If that fails, I will try tool Z.").
 4.  **One Goal at a Time (هدف واحد كل مرة):** Focus on fulfilling the user's immediate request. Don't suggest other files unless directly asked.
 
 ## Tool Usage Examples (أمثلة على استخدام الأدوات):
-- **User:** "عايز كل ملخصات المحاسبة" -> **Tool:** `send_folder({ folderPath: 'accounting/Summary' })`
-- **User:** "اديني محاضرة الاقتصاد الأولى pdf" -> **Tool:** `send_file({ query: 'المحاضرة الاولى اقتصاد' })`
-- **User:** "ما هو تعريف الذكاء الاصطناعي؟" -> **Tool:** `web_search({ query: 'ما هو تعريف الذكاء الاصطناعي' })`
-- **User:** "لخصلي المقالة دي عن تاريخ مصر" -> **Tool:** `fetch_and_summarize({ query: 'تاريخ مصر' })`
+- **User:** "عايز كل ملخصات المحاسبة" -> **Tool:** send_folder with folderPath: 'accounting/Summary'
+- **User:** "اديني محاضرة الاقتصاد الأولى pdf" -> **Tool:** send_file with query: 'المحاضرة الاولى اقتصاد'
+- **User:** "ما هو تعريف الذكاء الاصطناعي؟" -> **Tool:** web_search with query: 'ما هو تعريف الذكاء الاصطناعي'
+- **User:** "لخصلي المقالة دي عن تاريخ مصر" -> **Tool:** fetch_and_summarize with query: 'تاريخ مصر'
 
 Remember: You are a smart AI Agent - be accurate, careful with file sending, and ALWAYS respond in natural Egyptian Arabic, NEVER in JSON or technical format!`;
 }
@@ -1083,6 +1103,26 @@ async function processWithGeminiAI(messages, tools) {
         if (systemPrompt && historyForGemini.length <= 2) {
             messageToSend = `أنت مساعد ذكي للطلاب. تحدث بالعامية المصرية وكن ودوداً.
 
+**قواعد مهمة جداً للتعامل مع الأسئلة:**
+
+1. **إذا كان السؤال واضح بنسبة 60% أو أكثر - نفذ فوراً بدون أسئلة!**
+   - مثال: "عايز ملخص المحاسبة" → ابحث وأرسل الملف مباشرة
+   - مثال: "محتاج محاضرات الاقتصاد" → ابحث وأرسل المحاضرات مباشرة
+   - مثال: "ممكن التكليف" → ابحث وأرسل التكليف مباشرة
+
+2. **إذا كان السؤال غامض قليلاً - اسأل سؤال واحد أو اثنين فقط في رسالة واحدة:**
+   - ❌ لا تسأل: "تقصد إيه بالظبط؟ محاضرة رقم كام؟ من أي مادة؟"
+   - ✅ اسأل: "تمام! تقصد محاضرات المحاسبة ولا الاقتصاد؟"
+   - ✅ أو: "ماشي! عايز كل المحاضرات ولا محاضرة معينة؟"
+
+3. **افترض الأفضل - خمن بذكاء:**
+   - إذا قال "عايز محاضرة" وأنت تعرف أنه بيدرس محاسبة → ابحث في محاضرات المحاسبة
+   - إذا قال "التكليف" وموجود تكليف واحد بس → أرسله مباشرة
+
+4. **لا تكون ثرثار - اتكلم قليل واعمل كتير:**
+   - ❌ "تمام يا فندم! دلوقتي هبحث لك في الملفات المتاحة عندي وأشوف إيه المناسب..."
+   - ✅ "ماشي! لحظة..." [ثم أرسل الملف]
+
 معلومات مهمة - قواعد استخدام الأدوات:
 - **أنت المسؤول عن استخدام الأدوات** - لا تطلب من المستخدم استخدامها أبداً
 - **كن مستقلاً** - لا تسأل المستخدم عن المجلدات أو أسماء الملفات - ابحث بنفسك
@@ -1332,51 +1372,69 @@ export async function processWithGroqAI(userMessage, userId, userName = "الط�
         
     } catch (error) {
         console.error('❌ خطأ في Groq AI:', error.message);
-        console.log('🔄 محاولة التحويل إلى Gemini كـ Fallback...');
         
-        // محاولة استخدام Gemini كـ Fallback
-        try {
-            // إضافة رسالة المستخدم للذاكرة إذا لم تكن مضافة
-            const currentMemory = getConversationContext(userId);
-            const lastMessage = currentMemory[currentMemory.length - 1];
-            if (!lastMessage || lastMessage.content !== userMessage) {
-                addToMemory(userId, "user", userMessage);
-            }
+        // التحقق من نوع الخطأ - لا نستخدم Gemini إلا في حالات محددة
+        const shouldFallbackToGemini = error.message && (
+            error.message.includes('rate_limit') || 
+            error.message.includes('model_not_found') ||
+            error.message.includes('insufficient_quota')
+        );
+        
+        if (shouldFallbackToGemini) {
+            console.log('🔄 محاولة التحويل إلى Gemini كـ Fallback...');
             
-            // بناء المحادثة مع السياق
-            const messages = [
-                {
-                    role: "system",
-                    content: createSystemPrompt()
-                },
-                ...getConversationContext(userId)
-            ];
-            
-            // استخدام Gemini كـ Fallback
-            const geminiResponse = await processWithGeminiAI(messages, tools);
-            
-            if (geminiResponse.success) {
-                // إضافة رد Gemini للذاكرة
-                if (geminiResponse.text) {
-                    addToMemory(userId, "assistant", geminiResponse.text);
+            // محاولة استخدام Gemini كـ Fallback
+            try {
+                // إضافة رسالة المستخدم للذاكرة إذا لم تكن مضافة
+                const currentMemory = getConversationContext(userId);
+                const lastMessage = currentMemory[currentMemory.length - 1];
+                if (!lastMessage || lastMessage.content !== userMessage) {
+                    addToMemory(userId, "user", userMessage);
                 }
-                console.log('✅ نجح Fallback إلى Gemini!');
-                return geminiResponse;
-            } else {
-                // فشل Gemini أيضاً
-                console.error('❌ فشل Gemini Fallback أيضاً');
+                
+                // بناء المحادثة مع السياق
+                const messages = [
+                    {
+                        role: "system",
+                        content: createSystemPrompt()
+                    },
+                    ...getConversationContext(userId)
+                ];
+                
+                // استخدام Gemini كـ Fallback
+                const geminiResponse = await processWithGeminiAI(messages, tools);
+                
+                if (geminiResponse.success) {
+                    // إضافة رد Gemini للذاكرة
+                    if (geminiResponse.text) {
+                        addToMemory(userId, "assistant", geminiResponse.text);
+                    }
+                    console.log('✅ نجح Fallback إلى Gemini!');
+                    return geminiResponse;
+                } else {
+                    // فشل Gemini أيضاً
+                    console.error('❌ فشل Gemini Fallback أيضاً');
+                    return {
+                        success: false,
+                        message: null,
+                        error: `Groq failed: ${error.message}, Gemini also failed: ${geminiResponse.error}`
+                    };
+                }
+            } catch (fallbackError) {
+                console.error('❌ فشل Gemini Fallback:', fallbackError.message);
                 return {
                     success: false,
                     message: null,
-                    error: `Groq failed: ${error.message}, Gemini also failed: ${geminiResponse.error}`
+                    error: `Groq failed: ${error.message}, Gemini fallback failed: ${fallbackError.message}`
                 };
             }
-        } catch (fallbackError) {
-            console.error('❌ فشل Gemini Fallback:', fallbackError.message);
+        } else {
+            // خطأ آخر غير متعلق بالـ rate limit - نرجع الخطأ مباشرة
+            console.error('❌ خطأ في Groq (لن يتم استخدام Gemini Fallback)');
             return {
                 success: false,
                 message: null,
-                error: `Groq failed: ${error.message}, Gemini fallback failed: ${fallbackError.message}`
+                error: error.message
             };
         }
     }
