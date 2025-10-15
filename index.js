@@ -811,6 +811,39 @@ async function handleNewMessage(msg) {
                 }
                 break;
 
+            case 'albumMessage':
+                // معالجة رسائل الألبوم (عدة صور/فيديوهات معاً)
+                const album = messageContent;
+                const imageCount = album.expectedImageCount || 0;
+                const videoCount = album.expectedVideoCount || 0;
+                const totalCount = imageCount + videoCount;
+                
+                if (totalCount > 0) {
+                    // بناء رسالة الإشعار بالألبوم
+                    let albumNotification = buildCaption(senderName, '', '📸');
+                    albumNotification += ` *ألبوم وسائط* (${totalCount} عنصر)`;
+                    
+                    if (imageCount > 0 && videoCount > 0) {
+                        albumNotification += `\n🖼️ ${imageCount} صورة | 🎥 ${videoCount} فيديو`;
+                    } else if (imageCount > 0) {
+                        albumNotification += `\n🖼️ ${imageCount} ${imageCount === 1 ? 'صورة' : 'صور'}`;
+                    } else if (videoCount > 0) {
+                        albumNotification += `\n🎥 ${videoCount} ${videoCount === 1 ? 'فيديو' : 'فيديوهات'}`;
+                    }
+                    
+                    const albumSent = await telegramBot.telegram.sendMessage(
+                        targetChannel, 
+                        albumNotification, 
+                        { parse_mode: 'Markdown' }
+                    );
+                    messageCache.set(messageId, albumSent.message_id);
+                    logTelegramMessage(targetChannel, 'albumMessage', true, albumSent.message_id);
+                    console.log(`✅ تم إرسال إشعار الألبوم (${totalCount} عنصر) إلى Telegram`);
+                } else {
+                    console.log('ℹ️ تم استقبال albumMessage فارغ - سيتم معالجة الوسائط المرتبطة تلقائياً');
+                }
+                break;
+
             default:
                 console.log(`⚠️ تجاهل نوع الرسالة غير المدعوم: ${messageType}`);
                 logWarning(`نوع رسالة غير مدعوم: ${messageType} من ${senderName}`);
