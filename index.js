@@ -1142,11 +1142,24 @@ async function connectToWhatsApp() {
     
     sock.ev.on('messages.upsert', async ({ messages }) => {
         for (const msg of messages) {
-            await handleNewMessage(msg);
+            try {
+                await handleNewMessage(msg);
+            } catch (error) {
+                console.error('❌ خطأ في معالجة الرسالة:', error.message);
+                // لا نريد أن يتوقف البوت بسبب خطأ في رسالة واحدة
+                // نستمر في معالجة الرسائل الأخرى
+            }
         }
     });
 
-    sock.ev.on('messages.update', handleMessageUpdate);
+    sock.ev.on('messages.update', async (updates) => {
+        try {
+            await handleMessageUpdate(updates);
+        } catch (error) {
+            console.error('❌ خطأ في معالجة تحديث الرسالة:', error.message);
+            // نستمر في العمل حتى لو فشل تحديث رسالة
+        }
+    });
     
     if (!sock.authState.creds.registered) {
         await new Promise(resolve => setTimeout(resolve, 1000));

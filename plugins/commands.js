@@ -614,37 +614,76 @@ async function handleListChannelsCommand() {
 }
 
 /**
- * البحث عن LID للمستخدم من الجروبات
+ * البحث عن LID للمستخدم من الجروبات - مع حماية قوية ضد الأخطاء
  */
 async function findUserLID(sock, phoneNumber) {
-    try {
-        // البحث في جميع الجروبات
-        const groups = await sock.groupFetchAllParticipating();
-        
-        for (const groupId in groups) {
-            const group = groups[groupId];
+    // التحقق من صحة الاتصال قبل البدء
+    if (!sock || !sock.user) {
+        console.log('⚠️ الاتصال غير متاح - تخطي البحث عن LID');
+        return null;
+    }
+    
+    const maxRetries = 3;
+    let retryCount = 0;
+    const baseDelay = 1000; // 1 ثانية
+    
+    while (retryCount < maxRetries) {
+        try {
+            console.log(`🔎 البحث عن LID للمستخدم ${phoneNumber}... (محاولة ${retryCount + 1}/${maxRetries})`);
             
-            // البحث عن المستخدم في أعضاء الجروب
-            for (const participant of group.participants) {
-                const participantId = participant.id;
+            // إضافة timeout للعملية لمنع التعليق إلى الأبد
+            const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('Timeout')), 15000); // 15 ثانية timeout
+            });
+            
+            const fetchPromise = sock.groupFetchAllParticipating();
+            
+            // استخدام Promise.race للتأكد من عدم التعليق
+            const groups = await Promise.race([fetchPromise, timeoutPromise]);
+            
+            // البحث عن المستخدم في أعضاء الجروبات
+            for (const groupId in groups) {
+                const group = groups[groupId];
                 
-                // فحص إذا كان رقم الهاتف يطابق
-                if (participantId.startsWith(phoneNumber)) {
-                    // استخراج LID إذا كان موجوداً
-                    if (participantId.includes(':') && participantId.includes('@lid')) {
-                        console.log(`🔍 تم العثور على LID للمستخدم ${phoneNumber}: ${participantId}`);
-                        return participantId;
+                // التحقق من وجود المشاركين
+                if (!group.participants || !Array.isArray(group.participants)) {
+                    continue;
+                }
+                
+                for (const participant of group.participants) {
+                    const participantId = participant.id;
+                    
+                    // فحص إذا كان رقم الهاتف يطابق
+                    if (participantId && participantId.startsWith(phoneNumber)) {
+                        // استخراج LID إذا كان موجوداً
+                        if (participantId.includes(':') && participantId.includes('@lid')) {
+                            console.log(`✅ تم العثور على LID للمستخدم ${phoneNumber}: ${participantId}`);
+                            return participantId;
+                        }
                     }
                 }
             }
+            
+            console.log(`ℹ️  لم يتم العثور على LID للمستخدم ${phoneNumber}`);
+            return null;
+            
+        } catch (error) {
+            retryCount++;
+            console.error(`⚠️ خطأ في البحث عن LID (محاولة ${retryCount}/${maxRetries}):`, error.message);
+            
+            // إذا كان الخطأ متعلق بالاتصال ولدينا محاولات متبقية
+            if (retryCount < maxRetries) {
+                const delay = baseDelay * Math.pow(2, retryCount - 1); // exponential backoff
+                console.log(`⏳ إعادة المحاولة بعد ${delay}ms...`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+            } else {
+                console.error('❌ فشل البحث عن LID بعد كل المحاولات');
+                return null;
+            }
         }
-        
-        console.log(`ℹ️  لم يتم العثور على LID للمستخدم ${phoneNumber}`);
-        return null;
-    } catch (error) {
-        console.error('❌ خطأ في البحث عن LID:', error.message);
-        return null;
     }
+    
+    return null;
 }
 
 /**
@@ -692,24 +731,31 @@ async function handleAddEliteCommand(args, sock) {
     }
     
     // إذا تم إضافة رقم هاتف فقط ولم يتم إضافة LID، نحاول جلب LID تلقائياً
+    let lidLookupNote = '';
     if (phoneAdded && !lidAdded && phoneNumber && sock) {
-        console.log(`🔎 البحث عن LID للمستخدم ${phoneNumber}...`);
-        const userLID = await findUserLID(sock, phoneNumber);
-        
-        if (userLID) {
-            // إضافة LID تلقائياً
-            const success = addEliteUser(userLID);
-            if (success) {
-                addedItems.push(`LID: ${userLID} (تم جلبه تلقائياً ✨)`);
-                lidAdded = true;
+        try {
+            const userLID = await findUserLID(sock, phoneNumber);
+            
+            if (userLID) {
+                // إضافة LID تلقائياً
+                const success = addEliteUser(userLID);
+                if (success) {
+                    addedItems.push(`LID: ${userLID} (تم جلبه تلقائياً ✨)`);
+                    lidAdded = true;
+                }
+            } else {
+                lidLookupNote = '\n\n💡 ملاحظة: لم يتم العثور على LID للمستخدم. إذا كان المستخدم يستخدم LID، يمكنك إضافته يدوياً:\n.اضافة_نخبة ' + phoneNumber + ' <LID>';
             }
+        } catch (error) {
+            console.error('⚠️ خطأ أثناء البحث عن LID:', error.message);
+            lidLookupNote = '\n\n⚠️ تحذير: حدث خطأ أثناء البحث عن LID. تم إضافة رقم الهاتف فقط.\nإذا كان المستخدم يستخدم LID، يمكنك إضافته يدوياً لاحقاً:\n.اضافة_نخبة ' + phoneNumber + ' <LID>';
         }
     }
     
     if (addedItems.length > 0) {
         return {
             handled: true,
-            response: `✅ تم إضافة المستخدم للنخبة بنجاح!\n\n📱 تم إضافة:\n${addedItems.map(item => `   • ${item}`).join('\n')}`
+            response: `✅ تم إضافة المستخدم للنخبة بنجاح!\n\n📱 تم إضافة:\n${addedItems.map(item => `   • ${item}`).join('\n')}${lidLookupNote}`
         };
     } else {
         return {
