@@ -1,1348 +1,450 @@
-# 🔄 WhatsApp to Telegram Bridge Bot + Smart Auto-Response System
+# 🔥 WhatsApp to Telegram Bridge Bot
 
-<div dir="rtl">
+<div align="center">
 
-بوت احترافي متعدد الوظائف يجمع بين:
-- 🌉 **جسر ذكي** - نقل الرسائل تلقائياً من جروب WhatsApp إلى قناة Telegram
-- 🤖 **بوت محادثة ذكي** - الرد الآلي على المحادثات الخاصة بناءً على كلمات مفتاحية
+[![Node.js](https://img.shields.io/badge/Node.js-18.x+-43853d?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org/)
+[![WhatsApp](https://img.shields.io/badge/WhatsApp-Integration-25D366?style=for-the-badge&logo=whatsapp&logoColor=white)](https://whatsapp.com/)
+[![Telegram](https://img.shields.io/badge/Telegram-Bot-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white)](https://telegram.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
+[![AI Powered](https://img.shields.io/badge/AI-Groq%20%26%20Gemini-FF6F00?style=for-the-badge&logo=openai&logoColor=white)](https://groq.com/)
 
-</div>
+**Your ultimate WhatsApp ↔ Telegram bridge bot with AI superpowers! 🚀**
 
----
+Bridge your WhatsApp groups to Telegram channels, auto-respond to DMs with AI, and manage everything with simple commands. No cap! 💯
 
-## 📋 جدول المحتويات
-
-- [المميزات الكاملة](#-المميزات-الكاملة)
-- [المتطلبات](#-المتطلبات)
-- [التثبيت السريع](#-التثبيت-السريع)
-- [الإعداد الأولي](#️-الإعداد-الأولي)
-- [نظام الأوامر](#-نظام-الأوامر)
-- [الردود الآلية للمحادثات الخاصة](#-الردود-الآلية-للمحادثات-الخاصة)
-- [إدارة Git والتحديثات](#-إدارة-git-والتحديثات)
-- [حل المشاكل](#-حل-المشاكل)
-- [هيكل المشروع](#-هيكل-المشروع)
-- [الأسئلة الشائعة](#-الأسئلة-الشائعة)
-
----
-
-## ✨ المميزات الكاملة
-
-<div dir="rtl">
-
-### 🌉 جسر WhatsApp ↔ Telegram
-
-#### نقل جميع أنواع الرسائل
-- ✅ **النصوص العادية** - رسائل نصية بسيطة
-- ✅ **النصوص الممتدة** - روابط، منشن، رسائل منسقة
-- ✅ **الصور والفيديوهات** - مع دعم كامل للـ captions
-- ✅ **الألبومات (Albums)** - عدة صور/فيديوهات معاً مع إشعار ذكي
-- ✅ **المستندات والملفات** - PDF, Word, Excel, ZIP, إلخ
-- ✅ **الرسائل الصوتية** - Voice messages
-- ✅ **الملصقات (Stickers)** - جميع أنواع الاستيكرات
-- ✅ **استطلاعات الرأي** - Polls مع الخيارات
-- ✅ **جهات الاتصال** - Contact cards
-- ✅ **المواقع الجغرافية** - Location pins & Live location
-- ✅ **التفاعلات** - Emoji reactions (اختياري)
-- ✅ **إشعارات الحذف** - معرفة الرسائل المحذوفة (اختياري)
-- ✅ **التعديلات** - تتبع الرسائل المعدلة (اختياري)
-
-### 🤖 بوت المحادثة الذكي
-
-#### ردود آلية متقدمة
-- 💬 **ردود نصية** - نصوص منسقة على عدة أسطر
-- 📄 **ملفات PDF** - إرسال ملخصات، محاضرات، مستندات
-- 🖼️ **صور** - إرسال جداول، خرائط، صور توضيحية
-- 📦 **ردود مركبة** - نص + ملف في نفس الوقت
-- 🔑 **كلمات مفتاحية متعددة** - عدة كلمات لنفس الرد
-- 📝 **حفظ التنسيق** - الأسطر الجديدة تُحفظ تلقائياً
-- 🎯 **بحث ذكي** - يبحث عن الكلمات في أي مكان بالرسالة
-
-### ⚙️ نظام إدارة متقدم
-
-#### أوامر شاملة (35+ أمر)
-- 🔧 **إدارة البوت** - تشغيل، إيقاف، حالة، اختبار
-- 📢 **إدارة الجسور** - ربط جروبات WhatsApp بقنوات Telegram متعددة
-- 👑 **النخبة (Elite Users)** - تحديد من له صلاحية استخدام الأوامر
-- 🔍 **الفلاتر** - حظر، قائمة بيضاء، تصفية الرسائل
-- 🔔 **التنبيهات الذكية** - تنبيهات عند ذكر كلمات محددة
-- ⏰ **المهام المجدولة** - تنفيذ مهام تلقائية في أوقات محددة
-- 📊 **التقارير** - تقارير يومية، أسبوعية، وإحصائيات
-- 💬 **الردود الآلية** - إدارة كاملة للردود على المحادثات الخاصة
-
-### 🛡️ الأمان والموثوقية
-- 🔐 **دعم التشفير** - يتعامل مع رسائل التشفير في الجروبات
-- 👤 **عرض اسم المرسل** - معرفة من أرسل كل رسالة (اختياري)
-- 🔄 **إعادة الاتصال التلقائي** - في حالة انقطاع الاتصال
-- 💾 **تخزين الجلسة** - لا داعي لمسح QR في كل مرة
-- 📱 **دعم Pairing Code** - الاتصال برقم الهاتف
-- 📝 **سجلات مفصلة** - تتبع كامل لجميع العمليات
+[Features](#-features) • [Quick Start](#-quick-start) • [Commands](#-commands) • [AI Setup](#-ai-setup)
 
 </div>
 
 ---
 
-## 📋 المتطلبات
+## 🎯 What Does It Do?
 
-<div dir="rtl">
+This bot is literally **fire** 🔥 - it connects your WhatsApp and Telegram like never before:
 
-قبل البدء، تأكد من توفر:
+### 🌉 Bridge Mode
+- **Auto-forwards** everything from WhatsApp groups to Telegram channels
+- Supports **ALL** message types: text, images, videos, files, stickers, polls, locations - you name it!
+- **Multi-bridge** support - connect multiple WhatsApp groups to different Telegram channels
+- **Live sync** - edits and deletes are mirrored in real-time
 
-- **Node.js** - الإصدار 18.0.0 أو أحدث
-- **npm** - يأتي مع Node.js
-- **حساب WhatsApp** - للاتصال بالبوت
-- **Telegram Bot** - من [@BotFather](https://t.me/botfather)
-- **قناة Telegram** - لنشر الرسائل فيها
+### 🤖 Smart Auto-Response
+- **AI-powered** responses using Groq (llama-3.3-70b) & Google Gemini
+- **Keyword matching** - set up custom auto-replies for specific words
+- **Send files** automatically - PDFs, images, documents
+- **Context-aware** - the AI remembers your conversations
+- **Intelligent matching** - fuzzy search for keywords (typos? no problem!)
 
-</div>
-
----
-
-## 🚀 التثبيت السريع
-
-<div dir="rtl">
-
-### ⚡ التنصيب التلقائي (موصى به)
-
-**Linux / macOS / Termux:**
-```bash
-git clone https://github.com/obieda-hussien/what-sapp_bot.git
-cd what-sapp_bot
-chmod +x install.sh
-./install.sh
-```
-
-**Windows:**
-```batch
-git clone https://github.com/obieda-hussien/what-sapp_bot.git
-cd what-sapp_bot
-install.bat
-```
-
-السكريبت سيقوم تلقائياً بـ:
-- ✅ فحص وتنصيب Node.js (إذا لزم)
-- ✅ تنصيب جميع المكتبات
-- ✅ إنشاء ملفات الإعداد (.env و config.json)
-- ✅ طلب بيانات Telegram Bot
-- ✅ إعداد البنية الأساسية
-
-**📖 للتنصيب اليدوي والتفاصيل الكاملة:** راجع [INSTALL.md](INSTALL.md)
+### 👑 Elite Commands System
+- **35+ commands** for full bot control
+- **Access control** - decide who can use what
+- **Smart alerts** - get notified about important keywords
+- **Scheduled tasks** - automate actions at specific times
+- **Detailed reports** - daily, weekly, error logs, and more
 
 ---
 
-### 📦 التنصيب اليدوي
+## ✨ Features
 
-### 1️⃣ استنساخ المشروع
+### 📤 Message Forwarding
+✅ Text messages (with formatting)  
+✅ Images & Videos (with captions)  
+✅ Audio & Voice messages  
+✅ Documents & Files (PDF, DOCX, etc.)  
+✅ Stickers & GIFs  
+✅ Polls & Surveys  
+✅ Contacts  
+✅ Locations (static & live)  
+✅ Albums (multiple media)  
+✅ Message edits & deletions  
+✅ Emoji reactions  
+
+### 🧠 AI Features
+✅ **Groq AI** - Lightning-fast responses with llama-3.3-70b  
+✅ **Google Gemini** - Automatic fallback when Groq is down  
+✅ **Conversation memory** - Remembers context  
+✅ **File handling** - Can send PDFs, images, folders  
+✅ **Web search** - Looks up info on the internet  
+✅ **Natural language** - Talks in Egyptian Arabic like a real person  
+
+### 🎛️ Management
+✅ **Multi-bridge** - Multiple WhatsApp → Telegram connections  
+✅ **Elite users** - Role-based permissions  
+✅ **Filters** - Blacklist/whitelist users & keywords  
+✅ **Smart alerts** - Keyword notifications  
+✅ **Scheduled tasks** - Auto start/stop at specific times  
+✅ **Reports** - Daily, weekly, error logs  
+✅ **Auto-responses** - Keyword-based replies  
+✅ **Access control** - Manage who can use AI & auto-replies  
+
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
+- Node.js 18.x or higher
+- A WhatsApp account
+- A Telegram bot (get one from [@BotFather](https://t.me/botfather))
+- A Telegram channel
+
+### Installation
 
 ```bash
+# Clone the repo
 git clone https://github.com/obieda-hussien/what-sapp_bot.git
 cd what-sapp_bot
-```
 
-### 2️⃣ تثبيت المكتبات
-
-```bash
+# Install dependencies
 npm install
-```
 
-سيتم تثبيت المكتبات التالية:
-- `@whiskeysockets/baileys` - مكتبة WhatsApp
-- `telegraf` - مكتبة Telegram Bot
-- `dotenv` - إدارة المتغيرات البيئية
-- `pino` - للتسجيل (Logging)
-- `node-cache` - للتخزين المؤقت
-- `axios` - للطلبات HTTP
-- `groq-sdk` - للذكاء الاصطناعي (اختياري)
+# Set up environment variables
+cp .env.example .env
+nano .env  # or use any text editor
 
-</div>
-
----
-
-## ⚙️ الإعداد
-
-<div dir="rtl">
-
-### 1️⃣ إنشاء Telegram Bot
-
-1. افتح [@BotFather](https://t.me/botfather) في Telegram
-2. أرسل الأمر `/newbot`
-3. اختر اسم للبوت (مثال: "My WhatsApp Bridge")
-4. اختر username للبوت (يجب أن ينتهي بـ bot)
-5. **احفظ الـ Token** الذي سيظهر لك
-
-### 2️⃣ إعداد قناة Telegram
-
-1. أنشئ قناة جديدة في Telegram
-2. اجعلها خاصة (Private) للحماية
-3. أضف البوت كـ **Admin** في القناة
-4. أعطه صلاحية **Post Messages**
-5. احفظ username القناة أو ID (مثال: `@mychannel` أو `-1001234567890`)
-
-### 3️⃣ إنشاء ملف .env
-
-أنشئ ملف `.env` في مجلد المشروع:
-
-```bash
-# معلومات Telegram
-TELEGRAM_BOT_TOKEN=7123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw
-TELEGRAM_CHANNEL_ID=@your_channel_username
-
-# معلومات WhatsApp (سيظهر بعد التشغيل الأول)
-WHATSAPP_GROUP_JID=
-
-# إعدادات اختيارية (true/false)
-FORWARD_SENDER_NAME=true
-FORWARD_REACTIONS=true
-FORWARD_MESSAGE_EDITS=true
-```
-
-**ملاحظة:** يمكنك الحصول على Channel ID عن طريق:
-- استخدام [@userinfobot](https://t.me/userinfobot)
-- أو forward أي رسالة من القناة إلى [@userinfobot](https://t.me/userinfobot)
-
-</div>
-
----
-
-## 📱 الاستخدام
-
-<div dir="rtl">
-
-### التشغيل الأول
-
-```bash
+# Start the bot
 npm start
 ```
 
-### 1️⃣ الاتصال بـ WhatsApp
+### 🔐 Environment Setup
 
-**طريقة 1: QR Code (افتراضية)**
-- سيظهر QR Code في الـ Terminal
-- افتح واتساب → الإعدادات → الأجهزة المتصلة
-- امسح الـ QR Code
-
-**طريقة 2: Pairing Code**
-- ستُسأل عن رقم الهاتف
-- أدخل الرقم بالصيغة الدولية (مثال: 201234567890)
-- سيظهر لك كود من 8 أرقام
-- افتح واتساب → الأجهزة المتصلة → ربط جهاز → أدخل الكود
-
-### 2️⃣ اختيار الجروب
-
-بعد الاتصال الناجح، سيعرض البوت قائمة بجميع الجروبات:
-
-```
-📋 الجروبات المتاحة:
-
-1. 📱 العائلة
-   🆔 ID: 120363123456789012@g.us
-   👥 الأعضاء: 15
-   
-2. 📱 الشغل
-   🆔 ID: 120363987654321098@g.us
-   👥 الأعضاء: 8
-```
-
-**انسخ الـ JID** الخاص بالجروب المطلوب
-
-### 3️⃣ تحديث ملف .env
-
-افتح ملف `.env` وضع الـ JID:
+Edit the `.env` file with your credentials:
 
 ```env
-WHATSAPP_GROUP_JID=120363123456789012@g.us
+# Telegram Bot Token (get from @BotFather)
+TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
+
+# Telegram Channel ID (where messages will be sent)
+TELEGRAM_CHANNEL_ID=-1001234567890
+
+# WhatsApp Group JID (leave empty on first run - bot will show available groups)
+WHATSAPP_GROUP_JID=
+
+# Owner Phone Number (your phone number - gets elite access)
+OWNER_PHONE=201234567890
+
+# Optional: AI API Keys
+GROQ_API_KEY=your_groq_api_key  # Get from https://console.groq.com/keys
+GEMINI_API_KEY=your_gemini_key  # Get from https://makersuite.google.com/app/apikey
 ```
 
-### 4️⃣ إعادة التشغيل
+### 📱 First Run
 
-```bash
-npm start
-```
-
-الآن البوت سيبدأ بنقل الرسائل تلقائياً! 🎉
-
-### 💡 نصائح
-
-- **للتطوير مع auto-reload:**
-  ```bash
-  npm run dev
-  ```
-
-- **لإيقاف البوت:**
-  - اضغط `Ctrl + C` في الـ Terminal
-
-- **لإعادة التشغيل:**
-  - الجلسة محفوظة في `auth_info_baileys`
-  - لن تحتاج لمسح QR مرة أخرى
-
-</div>
+1. Run `npm start`
+2. Scan the QR code with your WhatsApp (or use pairing code)
+3. Bot will display all your WhatsApp groups
+4. Copy the Group JID and add it to `.env`
+5. Restart the bot
+6. Done! 🎉
 
 ---
 
-## 📁 هيكل المشروع
+## 🎮 Commands
 
-<div dir="rtl">
+All commands start with `.` (dot). Only **elite users** can use commands.
+
+### 🔧 Bot Control
+
+| Command | Description | Example |
+|---------|-------------|---------|
+| `.test` or `.تست` | Test if bot is working | `.test` |
+| `.start` or `.تشغيل` | Start the bot | `.start` |
+| `.stop` or `.ايقاف` | Stop the bot | `.stop` |
+| `.status` or `.الحالة` | Check bot status | `.status` |
+
+### 📢 Bridge Management
+
+| Command | Description | Example |
+|---------|-------------|---------|
+| `.add_channel` | Add WhatsApp → Telegram bridge | `.add_channel 1234@g.us @channel` |
+| `.remove_channel` | Remove a bridge | `.remove_channel 1234@g.us` |
+| `.channels` | List all bridges | `.channels` |
+| `.pause` | Pause a group temporarily | `.pause 1234@g.us` |
+| `.resume` | Resume a paused group | `.resume 1234@g.us` |
+
+### 👑 Elite User Management
+
+| Command | Description | Example |
+|---------|-------------|---------|
+| `.add_elite` | Add user to elite | `.add_elite 201234567890` |
+| `.remove_elite` | Remove user from elite | `.remove_elite 201234567890` |
+| `.elites` | List all elite users | `.elites` |
+
+### 🔍 Filters & Blocking
+
+| Command | Description | Example |
+|---------|-------------|---------|
+| `.block` | Block a user | `.block 201234567890` |
+| `.unblock` | Unblock a user | `.unblock 201234567890` |
+| `.enable_filter` | Enable message filtering | `.enable_filter` |
+| `.disable_filter` | Disable filtering | `.disable_filter` |
+| `.add_keyword` | Add keyword filter | `.add_keyword spam` |
+| `.remove_keyword` | Remove keyword filter | `.remove_keyword spam` |
+| `.keywords` | List filtered keywords | `.keywords` |
+
+### 🔔 Smart Alerts
+
+| Command | Description | Example |
+|---------|-------------|---------|
+| `.add_alert` | Add smart alert | `.add_alert urgent @admin` |
+| `.remove_alert` | Remove an alert | `.remove_alert urgent` |
+| `.alerts` | List all alerts | `.alerts` |
+| `.enable_alerts` | Enable smart alerts | `.enable_alerts` |
+| `.disable_alerts` | Disable smart alerts | `.disable_alerts` |
+
+### ⏰ Scheduled Tasks
+
+| Command | Description | Example |
+|---------|-------------|---------|
+| `.add_schedule` | Add scheduled task | `.add_schedule "Daily Stop" 23:00 stop` |
+| `.remove_schedule` | Remove a schedule | `.remove_schedule "Daily Stop"` |
+| `.schedules` | List all schedules | `.schedules` |
+
+### 💬 Auto-Response Management
+
+| Command | Description | Example |
+|---------|-------------|---------|
+| `.add_response` | Add auto-response | `.add_response text "hi" "Hello there!"` |
+| `.remove_response` | Remove auto-response | `.remove_response hi` |
+| `.responses` | List all responses | `.responses` |
+| `.enable_responses` | Enable auto-responses | `.enable_responses` |
+| `.disable_responses` | Disable auto-responses | `.disable_responses` |
+
+### 🤖 AI Management
+
+| Command | Description | Example |
+|---------|-------------|---------|
+| `.enable_ai` | Enable AI responses | `.enable_ai` |
+| `.disable_ai` | Disable AI responses | `.disable_ai` |
+| `.ai_status` | Check AI status | `.ai_status` |
+| `.ai_stats` | View AI statistics | `.ai_stats` |
+| `.clear_memory` | Clear AI conversation memory | `.clear_memory` |
+| `.files` | List available materials | `.files` |
+
+### 🔐 Access Control
+
+| Command | Description | Example |
+|---------|-------------|---------|
+| `.auto_mode` | Set auto-reply access mode | `.auto_mode elite` |
+| `.ai_mode` | Set AI access mode | `.ai_mode all` |
+| `.block_auto` | Block user from auto-replies | `.block_auto 201234567890` |
+| `.unblock_auto` | Unblock user from auto-replies | `.unblock_auto 201234567890` |
+| `.block_ai` | Block user from AI | `.block_ai 201234567890` |
+| `.unblock_ai` | Unblock user from AI | `.unblock_ai 201234567890` |
+| `.access_status` | View access control status | `.access_status` |
+
+### 📊 Reports & Logs
+
+| Command | Description | Example |
+|---------|-------------|---------|
+| `.daily_report` | Generate daily report | `.daily_report` |
+| `.weekly_report` | Generate weekly report | `.weekly_report` |
+| `.error_report` | View error logs | `.error_report` |
+| `.failed_report` | View failed transfers | `.failed_report` |
+| `.activity_report` | User activity report | `.activity_report` |
+| `.logs` | View specific logs | `.logs errors` |
+| `.clean_logs` | Clean old log files | `.clean_logs` |
+
+### 👨‍💼 Admin Management
+
+| Command | Description | Example |
+|---------|-------------|---------|
+| `.add_admin` | Add an admin | `.add_admin 201234567890 alerts` |
+| `.remove_admin` | Remove an admin | `.remove_admin 201234567890` |
+| `.admins` | List all admins | `.admins` |
+
+### ℹ️ Help
+
+| Command | Description | Example |
+|---------|-------------|---------|
+| `.help` or `.المساعدة` | Show all commands | `.help` |
+
+---
+
+## 🤖 AI Setup
+
+The bot supports **two AI providers** for smart auto-responses:
+
+### 🚀 Groq (Primary)
+- **Model**: llama-3.3-70b-versatile
+- **Speed**: Lightning fast ⚡
+- **Free tier**: Very generous
+- **Get key**: https://console.groq.com/keys
+
+### 🧠 Google Gemini (Fallback)
+- **Model**: gemini-2.0-flash-exp
+- **Fallback**: Auto-activates when Groq fails
+- **Free tier**: Available
+- **Get key**: https://makersuite.google.com/app/apikey
+
+### Setting Up AI
+
+1. **Get API Keys** (optional but recommended):
+   - Groq: Visit https://console.groq.com/keys
+   - Gemini: Visit https://makersuite.google.com/app/apikey
+
+2. **Add to `.env`**:
+   ```env
+   GROQ_API_KEY=gsk_your_actual_key_here
+   GEMINI_API_KEY=AIzaYour_actual_key_here
+   ```
+
+3. **Restart the bot** - It will validate keys on startup!
+
+### AI Features
+
+The AI can:
+- 🗣️ **Chat naturally** in Egyptian Arabic
+- 📚 **Send files** - PDFs, images, whole folders
+- 🔍 **Search the web** for information
+- 🧠 **Remember context** - keeps track of conversations
+- 📖 **Read text files** and explain them
+- 🌐 **Translate** content from English to Arabic
+- 💡 **Smart** - understands typos and context
+
+### How It Works
+
+When someone DMs your WhatsApp:
+1. Bot checks for **keyword matches** first (instant, no AI needed)
+2. If no match, uses **Groq AI** for intelligent response
+3. If Groq fails, falls back to **Gemini AI**
+4. If both fail, uses **keyword-only** responses
+
+---
+
+## 📁 Project Structure
 
 ```
 what-sapp_bot/
-│
-├── 📄 index.js                    # الملف الرئيسي للبوت
-│   ├── connectToWhatsApp()       # الاتصال بـ WhatsApp
-│   ├── handleNewMessage()        # معالجة الرسائل الواردة
-│   ├── handleMessageUpdate()     # معالجة تحديثات الرسائل
-│   ├── displayAllGroups()        # عرض قائمة الجروبات
-│   ├── buildCaption()            # بناء نص المرفقات
-│   ├── getQuotedInfo()           # استخراج معلومات الرد
-│   └── getMentions()             # استخراج المنشن
-│
-├── 📁 utils/
-│   └── media.js                  # دوال معالجة الوسائط
-│       └── downloadMediaMessage() # تنزيل الصور/الفيديوهات/الملفات
-│
-├── 📄 config.js                   # (فارغ حالياً - للإعدادات المستقبلية)
-│
-├── 📁 auth_info_baileys/          # مجلد حفظ جلسة WhatsApp
-│   ├── creds.json                # بيانات الاعتماد
-│   └── ...                       # ملفات التشفير والجلسة
-│
-├── 📄 package.json                # معلومات المشروع والمكتبات
-├── 📄 .env                        # المتغيرات البيئية (لا تشاركه!)
-├── 📄 .gitignore                  # ملفات يتم تجاهلها من Git
-└── 📄 README.md                   # هذا الملف
-
+├── index.js              # Main bot file
+├── package.json          # Dependencies
+├── .env                  # Your credentials (DO NOT commit!)
+├── config.json           # Bot configuration
+├── plugins/
+│   ├── commands.js       # Command handler
+│   ├── privateChat.js    # Auto-response system
+│   ├── alerts.js         # Smart alerts & schedules
+│   └── reports.js        # Report generator
+├── utils/
+│   ├── groqAssistant.js  # AI integration
+│   ├── config.js         # Config management
+│   ├── logger.js         # Logging system
+│   ├── accessControl.js  # Access permissions
+│   ├── intelligentMatcher.js  # Smart keyword matching
+│   └── media.js          # Media handling
+├── Materials/            # Store your files here (PDFs, images, etc.)
+└── logs/                 # Log files
 ```
 
-### 🔍 شرح الملفات الرئيسية
-
-#### `index.js` - القلب النابض للبوت
-
-هذا الملف يحتوي على كل المنطق الرئيسي:
-
-1. **الاتصال بـ WhatsApp**
-   - استخدام Baileys للاتصال
-   - حفظ الجلسة تلقائياً
-   - إعادة الاتصال عند الانقطاع
-
-2. **استقبال الرسائل**
-   - الاستماع لـ `messages.upsert` event
-   - تصفية رسائل البروتوكول (senderKeyDistributionMessage)
-   - تحديد نوع الرسالة
-
-3. **معالجة أنواع الرسائل المختلفة**
-   - Switch statement لكل نوع
-   - تنزيل الوسائط إذا لزم الأمر
-   - بناء النص والـ caption
-
-4. **الإرسال إلى Telegram**
-   - استخدام Telegraf
-   - حفظ message IDs في cache
-   - معالجة الأخطاء
-
-#### `utils/media.js` - معالج الوسائط
-
-- تنزيل الملفات من WhatsApp
-- تحويلها إلى Buffer
-- جاهزة للإرسال إلى Telegram
-
-#### `auth_info_baileys/` - مجلد الجلسة
-
-- **مهم جداً:** احتفظ بنسخة احتياطية منه!
-- يحتوي على بيانات التشفير
-- عند حذفه، ستحتاج لمسح QR مرة أخرى
-
-</div>
-
 ---
 
-## 🔧 المتغيرات البيئية
+## 🎨 Customization
 
-<div dir="rtl">
+### Adding Auto-Responses
 
-### المتغيرات الإجبارية
+You can add responses via command or directly in `config.json`:
 
-| المتغير | الوصف | مثال |
-|---------|-------|------|
-| `TELEGRAM_BOT_TOKEN` | Token من BotFather | `7123456789:AAHdqTcvC...` |
-| `TELEGRAM_CHANNEL_ID` | معرف القناة أو username | `@mychannel` أو `-1001234567890` |
-| `WHATSAPP_GROUP_JID` | معرف جروب WhatsApp | `120363123456789012@g.us` |
-
-### المتغيرات الاختيارية
-
-| المتغير | القيمة الافتراضية | الوصف |
-|---------|-------------------|-------|
-| `FORWARD_SENDER_NAME` | `true` | عرض اسم المرسل مع كل رسالة |
-| `FORWARD_REACTIONS` | `true` | نقل التفاعلات (emoji reactions) |
-| `FORWARD_MESSAGE_EDITS` | `true` | نقل تعديلات وحذف الرسائل |
-
-### أمثلة على الاستخدام
-
-```env
-# مثال 1: النقل الكامل مع جميع المميزات
-TELEGRAM_BOT_TOKEN=7123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw
-TELEGRAM_CHANNEL_ID=@my_bridge_channel
-WHATSAPP_GROUP_JID=120363123456789012@g.us
-FORWARD_SENDER_NAME=true
-FORWARD_REACTIONS=true
-FORWARD_MESSAGE_EDITS=true
-
-# مثال 2: النقل البسيط بدون أسماء أو تفاعلات
-TELEGRAM_BOT_TOKEN=7123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw
-TELEGRAM_CHANNEL_ID=-1001234567890
-WHATSAPP_GROUP_JID=120363987654321098@g.us
-FORWARD_SENDER_NAME=false
-FORWARD_REACTIONS=false
-FORWARD_MESSAGE_EDITS=false
+**Via Command**:
+```
+.add_response text "hello" "Hi there! How can I help?"
+.add_response document "syllabus" "/path/to/syllabus.pdf" "Here's the syllabus"
+.add_response image "schedule" "/path/to/schedule.jpg" "Class schedule"
 ```
 
-</div>
-
----
-
-## 📨 أنواع الرسائل المدعومة
-
-<div dir="rtl">
-
-| النوع | الوصف | مثال |
-|------|-------|------|
-| 💬 **conversation** | نصوص بسيطة | "مرحباً كيف حالك؟" |
-| 📝 **extendedTextMessage** | نصوص منسقة، روابط، منشن | "شوف الرابط ده https://..." |
-| 📸 **imageMessage** | صور مع أو بدون caption | صورة + "منظر جميل" |
-| 🎥 **videoMessage** | فيديوهات | فيديو قصير |
-| 📄 **documentMessage** | ملفات (PDF, Word, Excel, ZIP) | presentation.pdf |
-| 🎵 **audioMessage** | رسائل صوتية | Voice message |
-| 🎭 **stickerMessage** | ملصقات | استيكر متحرك |
-| 📊 **pollCreationMessage** | استطلاعات رأي | "ما رأيك في...؟" |
-| 📇 **contactMessage** | بطاقات اتصال | أحمد - 0123456789 |
-| 📍 **locationMessage** | مواقع جغرافية | Location pin |
-| 📍 **liveLocationMessage** | مواقع مباشرة | Live location sharing |
-| ❤️ **reactionMessage** | تفاعلات emoji | ❤️ على رسالة |
-| 🗑️ **protocolMessage** | إشعارات الحذف | "تم حذف رسالة" |
-
-### ملاحظات هامة
-
-1. **رسائل التشفير:** البوت يتعامل تلقائياً مع `senderKeyDistributionMessage` ويتجاهلها
-2. **الروابط:** يتم معالجتها كـ `extendedTextMessage`
-3. **الصور مع نص:** تُرسل كصورة مع caption
-4. **التفاعلات:** يمكن تعطيلها من `.env`
-
-</div>
-
----
-
-## 💬 الردود الآلية للمحادثات الخاصة
-
-<div dir="rtl">
-
-البوت الآن يدعم الرد الآلي على المحادثات الخاصة بناءً على كلمات مفتاحية محددة. يمكن للبوت أن:
-- يرسل ردود نصية
-- يرسل ملفات PDF (ملخصات، محاضرات، assignments)
-- يرسل صور
-- يرسل نصوص مع ملفات معاً
-
-### 🧠 نظام المطابقة الذكية (Intelligent Matching)
-
-البوت يستخدم الآن **خوارزمية متقدمة** للبحث عن الكلمات المفتاحية:
-
-#### المميزات الذكية:
-- ✨ **التطابق التقريبي (Fuzzy Matching)** - يفهم الأخطاء الإملائية البسيطة
-- 🔤 **دعم كامل للعربية** - يتعامل مع التشكيل وأشكال الحروف المختلفة (ة/ه، ى/ي، إ/أ/آ)
-- 🎯 **نظام تسجيل ذكي** - يقيّم مدى تطابق الرسالة ويختار الأفضل
-- 🧩 **التطابق الجزئي** - يفهم حتى لو كانت بعض الكلمات مفقودة
-- 💡 **اكتشاف النية** - يميز بين السؤال، الطلب، التحية، إلخ
-- 📏 **حساب القرب** - يعطي أولوية للكلمات في بداية الرسالة
-
-#### أمثلة على الذكاء:
-
-**الرسالة**: "عايز ملخص محاسبه" (خطأ إملائي: ه بدل ة)  
-✅ يفهمها ويطابقها مع "ملخص محاسبة"
-
-**الرسالة**: "محتاج المحاضره الاولي"  
-✅ يطابقها مع "المحاضرة الاولي محاسبة"
-
-**الرسالة**: "ممكن ملخص مادة المحاسبة لو سمحت"  
-✅ يستخرج "ملخص محاسبة" من وسط الكلام
-
-#### تفعيل/تعطيل المطابقة الذكية:
-في ملف `config.json`:
+**In config.json**:
 ```json
-"privateChatResponses": {
-  "enabled": true,
-  "intelligentMatching": true,  // true = ذكي، false = بسيط
-  "keywords": [...]
-}
-```
-
-### إعداد الردود الآلية
-
-#### 1. تفعيل الردود الآلية
-```
-.تفعيل_ردود
-```
-
-#### 2. إضافة رد نصي
-يمكنك كتابة النص على عدة أسطر مباشرة في الرسالة:
-
-```
-.اضافة_رد نص مواعيد المحاضرات,جدول المحاضرات | 📅 جدول المحاضرات:
-
-الأحد: 10 صباحاً - محاسبة
-الاثنين: 2 مساءً - إحصاء
-الأربعاء: 10 صباحاً - اقتصاد
-```
-
-**ملاحظة**: اكتب الأمر على عدة أسطر في WhatsApp وسيتم حفظ التنسيق تلقائياً.
-
-#### 3. إضافة رد بملف PDF
-```
-.اضافة_رد ملف ملخص محاسبة,ملخص المحاسبة | /path/to/accounting_summary.pdf
-```
-
-#### 4. إضافة رد بصورة
-```
-.اضافة_رد صورة جدول الامتحانات | /path/to/exam_schedule.jpg
-```
-
-#### 5. إضافة رد كامل (نص + ملف)
-يمكنك كتابة النص على عدة أسطر:
-
-```
-.اضافة_رد كامل اسايمنت المحاضرة الاولي | ✍️ Assignment المحاضرة الأولى:
-
-📝 حل الأسئلة من 1 إلى 5
-📅 آخر موعد: الأحد القادم | /path/to/assignment1.jpg
-```
-
-#### 6. عرض جميع الردود
-```
-.الردود
-```
-
-#### 7. حذف رد معين
-```
-.حذف_رد ملخص محاسبة
-```
-
-#### 8. تعطيل الردود
-```
-.تعطيل_ردود
-```
-
-### مثال على الاستخدام
-
-عندما يرسل شخص في الخاص:
-```
-عايز ملخص مادة المحاسبة
-```
-
-سيرد البوت تلقائياً بملف الـ PDF للملخص (إذا تم إعداده مسبقاً).
-
-### ملاحظات هامة
-
-- الردود الآلية تعمل فقط في المحادثات الخاصة، وليس في المجموعات
-- يجب أن تكون ملفات PDF والصور موجودة على السيرفر
-- يمكن تحديد عدة كلمات مفتاحية لنفس الرد (مفصولة بفاصلة)
-- البوت يبحث عن الكلمة المفتاحية في أي مكان من الرسالة
-- إذا لم يجد البوت أي كلمة مفتاحية، لن يرد
-
-</div>
-
----
-
-## 🎯 مثال على المخرجات
-
-<div dir="rtl">
-
-```
-╔════════════════════════════════════════════════╗
-║     ✅ تم الاتصال بواتساب بنجاح!              ║
-╚════════════════════════════════════════════════╝
-
-📋 الجروبات المتاحة:
-
-1. 📱 العائلة
-   🆔 ID: 120363123456789012@g.us
-   👥 الأعضاء: 15
-   👤 المنشئ: 201234567890@s.whatsapp.net
-────────────────────────────────────────────────
-
-2. 📱 الشغل
-   🆔 ID: 120363987654321098@g.us
-   👥 الأعضاء: 8
-   👤 المنشئ: 201098765432@s.whatsapp.net
-────────────────────────────────────────────────
-
-💡 لاستخدام مجموعة معينة، انسخ الـ ID وضعه في ملف .env
-
-════════════════════════════════════════════════
-
-📨 رسالة جديدة من أحمد (AC0A457AD941BAEDF76E50D66405279D)
-✅ تم إرسال النص إلى Telegram
-
-📨 رسالة جديدة من محمد (AC48067A981B7924F0E476009CED39E1)
-✅ تم إرسال الصورة إلى Telegram
-
-📨 رسالة جديدة من سارة (ACCAA3B6F184FAD5F3DF03BA79A3AFD1)
-✅ تم إرسال المستند إلى Telegram
-```
-
-</div>
-
----
-
-## 🔧 المشاكل الشائعة وحلولها
-
-<div dir="rtl">
-
-### ❌ "Cannot find module 'dotenv'"
-
-**السبب:** لم يتم تثبيت المكتبات
-
-**الحل:**
-```bash
-npm install
-```
-
----
-
-### ❌ "TELEGRAM_BOT_TOKEN is not defined"
-
-**السبب:** ملف `.env` غير موجود أو فارغ
-
-**الحل:**
-1. تأكد من وجود ملف `.env` في المجلد الرئيسي
-2. تأكد من كتابة المتغيرات بشكل صحيح
-3. تأكد من عدم وجود مسافات زائدة
-
----
-
-### ❌ "Connection closed"
-
-**السبب:** مشكلة في الاتصال بـ WhatsApp
-
-**الحل:**
-1. تأكد من اتصال الإنترنت
-2. احذف مجلد `auth_info_baileys`
-3. أعد التشغيل وامسح QR مرة أخرى
-
----
-
-### ❌ لا يتم إرسال الرسائل إلى Telegram
-
-**السبب:** البوت ليس admin في القناة
-
-**الحل:**
-1. افتح إعدادات القناة
-2. Administrators → Add Administrator
-3. اختر البوت
-4. أعطه صلاحية "Post Messages"
-
----
-
-### ❌ "تجاهل نوع الرسالة غير المدعوم"
-
-**السبب:** نوع رسالة جديد غير مدعوم حالياً
-
-**الحل:**
-- هذا طبيعي لبعض الرسائل الخاصة بالبروتوكول (مثل رسائل التشفير)
-- البوت يدعم جميع الأنواع الشائعة: نصوص، صور، فيديوهات، ألبومات، ملفات، صوت، ملصقات، استطلاعات، جهات اتصال، مواقع
-- إذا كانت رسالة مهمة ومتكررة، افتح issue على GitHub
-
----
-
-### ⚠️ "Disconnected: 401 - Logged out"
-
-**السبب:** تم تسجيل الخروج من WhatsApp Web
-
-**الحل:**
-1. احذف مجلد `auth_info_baileys`
-2. أعد التشغيل وامسح QR
-
-</div>
-
----
-
-## 🚀 التطوير المستقبلي
-
-<div dir="rtl">
-
-### 🎯 اقتراحات للنسخ القادمة
-
-#### 1. **دعم قنوات متعددة** 🔀
-- إمكانية نقل رسائل عدة جروبات إلى قنوات مختلفة
-- ملف config.json لإدارة التوجيهات:
-  ```json
-  {
-    "bridges": [
+{
+  "privateChatResponses": {
+    "enabled": true,
+    "intelligentMatching": true,
+    "keywords": [
       {
-        "whatsapp": "120363123@g.us",
-        "telegram": "@channel1"
-      },
-      {
-        "whatsapp": "120363456@g.us",
-        "telegram": "@channel2"
+        "keywords": ["hello", "hi", "hey"],
+        "responseType": "text",
+        "text": "Hi there! How can I help?",
+        "filePath": null,
+        "caption": null
       }
     ]
   }
-  ```
+}
+```
 
-#### 2. **فلترة الرسائل** 🔍
-- تجاهل رسائل من أعضاء معينين
-- فلترة الرسائل بناءً على كلمات مفتاحية
-- نقل أنواع معينة فقط (صور فقط، مستندات فقط)
-
-#### 3. **تحسينات الـ Formatting** ✨
-- تنسيق أفضل للرسائل
-- إضافة timestamp
-- ترجمة تلقائية (اختياري)
-- preview للروابط
-
-#### 4. **Dashboard ويب** 🖥️
-- واجهة ويب لإدارة البوت
-- إحصائيات (عدد الرسائل، أكثر الأعضاء نشاطاً)
-- تشغيل/إيقاف البوت
-- مشاهدة الـ logs
-
-#### 5. **النسخ الاحتياطي التلقائي** 💾
-- حفظ نسخة من الوسائط على السحابة
-- backup للرسائل في database
-- استعادة الرسائل
-
-#### 6. **البوت التفاعلي** 🤖
-- الرد على الأوامر في Telegram
-- إرسال رسائل من Telegram إلى WhatsApp
-- استطلاع رأي تفاعلي
-
-#### 7. **Webhook Support** 🔗
-- إرسال الرسائل إلى API خارجي
-- التكامل مع خدمات أخرى (Discord, Slack)
-- Webhooks للإشعارات
-
-#### 8. **تحسينات الأداء** ⚡
-- معالجة الرسائل بشكل أسرع
-- ضغط الصور قبل الإرسال
-- queue system للرسائل الكثيرة
-
-#### 9. **الأمان والخصوصية** 🔐
-- تشفير البيانات الحساسة
-- 2FA للوصول إلى البوت
-- تسجيل الأنشطة (audit log)
-
-#### 10. **التوثيق المتقدم** 📚
-- فيديوهات شرح
-- أمثلة أكثر
-- FAQ موسع
-- دعم لغات متعددة في الوثائق
-
-### 💡 أفكار إضافية
-
-- **التنبيهات الذكية:** إشعارات خاصة لكلمات معينة
-- **الجدولة:** إيقاف البوت في أوقات معينة
-- **التقارير:** تقرير يومي/أسبوعي عن النشاط
-- **المشرفين:** نظام صلاحيات للمشرفين
-- **الردود الآلية:** رسائل آلية بناءً على محتوى الرسالة
-
-### 🤝 كيف تساهم؟
-
-إذا كان لديك اقتراح أو تريد تطوير أي ميزة:
-
-1. Fork المشروع
-2. أنشئ branch جديد: `git checkout -b feature/amazing-feature`
-3. Commit التغييرات: `git commit -m 'Add amazing feature'`
-4. Push للـ branch: `git push origin feature/amazing-feature`
-5. افتح Pull Request
-
-أو افتح [Issue جديد](https://github.com/obieda-hussien/what-sapp_bot/issues) لمناقشة الفكرة!
-
-</div>
+**Response Types**:
+- `text` - Text only
+- `document` - File only (PDF, Word, etc.)
+- `image` - Image only (JPG, PNG, etc.)
+- `both` - Text + File
 
 ---
 
-## 🤝 المساهمة
+## 🐛 Troubleshooting
 
-<div dir="rtl">
+### Bot not connecting to WhatsApp?
+- Make sure you scanned the QR code
+- Check your internet connection
+- Delete `auth_info_baileys` folder and restart
 
-نرحب بجميع المساهمات! سواء كانت:
+### Messages not forwarding?
+- Verify `WHATSAPP_GROUP_JID` in `.env`
+- Check that bot is active: `.status`
+- Make sure group isn't paused: `.channels`
 
-- 🐛 الإبلاغ عن bugs
-- 💡 اقتراح مميزات جديدة
-- 📝 تحسين التوثيق
-- 💻 كتابة كود
+### AI not responding?
+- Check if API keys are valid: Look for validation messages on startup
+- Verify keys at https://console.groq.com or https://makersuite.google.com
+- Check AI status: `.ai_status`
+- View AI stats: `.ai_stats`
 
-### خطوات المساهمة
+### Commands not working?
+- Only **elite users** can use commands
+- Check if you're elite: `.elites`
+- Add yourself: Set `OWNER_PHONE` in `.env` or use `.add_elite` from another elite user
 
-1. **Fork** المشروع
-2. أنشئ **branch** للميزة الجديدة
-3. **Commit** التغييرات
-4. **Push** للـ branch
-5. افتح **Pull Request**
-
-### 🔄 إنشاء بوت فرعي
-
-تريد إنشاء نسخة خاصة بك من البوت؟
-
-1. اضغط زر **Fork** في أعلى الصفحة
-2. Clone النسخة الخاصة بك:
-   ```bash
-   git clone https://github.com/YOUR_USERNAME/what-sapp_bot.git
-   cd what-sapp_bot
-   ```
-3. شغّل سكريبت التنصيب:
-   ```bash
-   ./install.sh      # Linux/Mac/Termux
-   install.bat       # Windows
-   ```
-4. اتبع التعليمات في [INSTALL.md](INSTALL.md)
-
-الآن لديك بوت مستقل تماماً! 🎉
-
-</div>
+### Invalid API Key Error?
+The bot now validates keys on startup! If you see:
+```
+❌ Groq API Key: غير صالح
+   السبب: المفتاح قصير جداً
+```
+- Get a new key from https://console.groq.com/keys
+- Make sure you copied the entire key
+- Remove any extra spaces
+- Restart the bot after updating
 
 ---
 
-## 🔧 إدارة Git والتحديثات
-
-<div dir="rtl">
-
-### 📥 تحديث المشروع (Pull)
-
-#### 1. تحديث من GitHub (الطريقة العادية)
-```bash
-# تحديث البرانش الحالي
-git pull origin main
-
-# أو تحديث برانش معين
-git pull origin <branch-name>
-```
-
-#### 2. تحديث إجباري (Force Pull)
-```bash
-# احفظ تغييراتك المحلية أولاً
-git stash
-
-# حذف جميع التغييرات المحلية والتحديث
-git fetch origin
-git reset --hard origin/main
-
-# أو استعادة التغييرات المحفوظة
-git stash pop
-```
-
-#### 3. تحديث مع الحفاظ على التغييرات المحلية
-```bash
-# طريقة 1: Stash ثم Pull
-git stash
-git pull origin main
-git stash pop
-
-# طريقة 2: Rebase
-git pull --rebase origin main
-```
-
-### 📤 رفع التحديثات (Push)
-
-#### 1. رفع تحديثات عادية
-```bash
-# إضافة التغييرات
-git add .
-
-# أو إضافة ملفات محددة
-git add file1.js file2.js
-
-# عمل Commit
-git commit -m "وصف التحديث"
-
-# رفع للـ Repository
-git push origin main
-```
-
-#### 2. رفع إجباري (Force Push)
-```bash
-# ⚠️ تحذير: استخدم بحذر - سيحذف التغييرات على السيرفر
-
-# رفع إجباري
-git push --force origin main
-
-# أو الطريقة الآمنة
-git push --force-with-lease origin main
-```
-
-#### 3. رفع برانش جديد
-```bash
-# إنشاء برانش جديد
-git checkout -b new-feature
-
-# رفع البرانش للمرة الأولى
-git push -u origin new-feature
-```
-
-### 🔄 حل التعارضات (Conflicts)
-
-#### 1. عند Pull مع تعارضات
-```bash
-# محاولة Pull
-git pull origin main
-
-# إذا حدث تعارض، ستظهر رسالة
-# افتح الملفات المتعارضة وعدّل الأجزاء التالية:
-# <<<<<<< HEAD
-# التغييرات المحلية
-# =======
-# التغييرات من السيرفر
-# >>>>>>> origin/main
-
-# بعد التعديل:
-git add .
-git commit -m "حل التعارضات"
-git push origin main
-```
-
-#### 2. إلغاء Pull مع تعارضات
-```bash
-# إذا أردت إلغاء عملية Pull والتعارضات
-git merge --abort
-
-# أو إلغاء Rebase
-git rebase --abort
-```
-
-#### 3. قبول التغييرات من جهة واحدة
-```bash
-# قبول التغييرات المحلية (yours)
-git checkout --ours <file>
-
-# قبول التغييرات من السيرفر (theirs)
-git checkout --theirs <file>
-
-# ثم:
-git add <file>
-git commit -m "حل التعارض"
-```
-
-### 🗑️ حذف الملفات
-
-#### 1. حذف ملفات من Git والنظام
-```bash
-# حذف ملف واحد
-git rm file.txt
-
-# حذف عدة ملفات
-git rm file1.txt file2.txt
-
-# حذف مجلد كامل
-git rm -r folder/
-
-# Commit الحذف
-git commit -m "حذف ملفات"
-git push origin main
-```
-
-#### 2. حذف من Git فقط (Keep locally)
-```bash
-# حذف من Git لكن يبقى في النظام
-git rm --cached file.txt
-
-# حذف مجلد من Git
-git rm -r --cached folder/
-
-# مفيد للملفات التي أضفتها للـ .gitignore لاحقاً
-git rm --cached -r node_modules/
-git commit -m "إزالة node_modules من Git"
-```
-
-#### 3. حذف جميع الملفات والبدء من جديد
-```bash
-# ⚠️ تحذير: هذا سيحذف كل شيء!
-
-# حذف كل التغييرات المحلية
-git reset --hard HEAD
-
-# حذف كل الملفات غير المتتبعة
-git clean -fd
-
-# العودة لآخر commit
-git reset --hard origin/main
-```
-
-### 📝 أوامر Git مفيدة أخرى
-
-#### عرض الحالة
-```bash
-# حالة المشروع
-git status
-
-# السجل (Log)
-git log --oneline
-
-# الفروق (Diff)
-git diff
-```
-
-#### التراجع عن التغييرات
-```bash
-# التراجع عن ملف محدد
-git checkout -- file.txt
-
-# التراجع عن آخر commit (لكن احتفظ بالتغييرات)
-git reset --soft HEAD~1
-
-# التراجع عن آخر commit (واحذف التغييرات)
-git reset --hard HEAD~1
-```
-
-#### Branches (الفروع)
-```bash
-# عرض جميع الفروع
-git branch -a
-
-# إنشاء فرع جديد
-git branch new-branch
-
-# التبديل لفرع
-git checkout new-branch
-
-# إنشاء والتبديل في أمر واحد
-git checkout -b new-branch
-
-# حذف فرع
-git branch -d branch-name
-
-# حذف فرع إجباري
-git branch -D branch-name
-```
-
-### 🔐 أمان Git
-
-```bash
-# عدم حفظ بيانات حساسة
-echo ".env" >> .gitignore
-echo "auth_info_baileys/" >> .gitignore
-echo "config.json" >> .gitignore
-
-# Commit التحديث
-git add .gitignore
-git commit -m "إضافة ملفات للـ gitignore"
-git push origin main
-```
-
-### 💡 نصائح مهمة
-
-1. **اعمل Backup دائماً** قبل أي عملية Force
-2. **اقرأ الرسائل** التي تظهر من Git بعناية
-3. **استخدم Branch** للمميزات الجديدة
-4. **اكتب Commit Messages واضحة** بالعربية أو الإنجليزية
-5. **اعمل Pull قبل Push** لتجنب التعارضات
-
-### 📱 استخدام Git على Termux
-
-```bash
-# تثبيت Git على Termux
-pkg install git
-
-# إعداد Git
-git config --global user.name "Your Name"
-git config --global user.email "your.email@example.com"
-
-# استنساخ المشروع
-git clone https://github.com/obieda-hussien/what-sapp_bot.git
-cd what-sapp_bot
-
-# باقي الأوامر نفسها كما في الأعلى
-```
-
-</div>
+## 🤝 Contributing
+
+Contributions are welcome! Feel free to:
+- 🐛 Report bugs
+- 💡 Suggest features
+- 🔧 Submit pull requests
+- ⭐ Star the repo if you like it!
 
 ---
 
-## 🎯 نظام الأوامر الكامل
+## 📜 License
 
-<div dir="rtl">
-
-البوت يدعم أكثر من **35 أمر** لإدارة شاملة. جميع الأوامر تبدأ بنقطة `.`
-
-### 🔧 أوامر إدارة البوت العامة
-
-| الأمر | الوصف | مثال |
-|------|-------|------|
-| `.تست` | فحص حالة البوت | `.تست` |
-| `.ايقاف` | إيقاف البوت | `.ايقاف` |
-| `.تشغيل` | تشغيل البوت | `.تشغيل` |
-| `.الحالة` | عرض حالة البوت والجسور | `.الحالة` |
-| `.ايقاف_مؤقت` | إيقاف نقل رسائل الجروب الحالي | `.ايقاف_مؤقت` |
-| `.استئناف` | استئناف نقل الرسائل | `.استئناف` |
-| `.المساعدة` | عرض دليل الأوامر | `.المساعدة` |
-
-### 📢 أوامر إدارة الجسور (القنوات)
-
-| الأمر | الوصف | مثال |
-|------|-------|------|
-| `.اضافة_قناة` | ربط جروب واتساب بقناة تيليجرام | `.اضافة_قناة <group_id> <channel_id>` |
-| `.حذف_قناة` | حذف جسر معين | `.حذف_قناة <group_id>` |
-| `.القنوات` | عرض جميع الجسور | `.القنوات` |
-
-### 👑 أوامر إدارة النخبة
-
-| الأمر | الوصف | مثال |
-|------|-------|------|
-| `.اضافة_نخبة` | إضافة مستخدم للنخبة | `.اضافة_نخبة 201234567890` |
-| `.حذف_نخبة` | حذف مستخدم من النخبة | `.حذف_نخبة 201234567890` |
-| `.النخبة` | عرض قائمة النخبة | `.النخبة` |
-
-### 🔍 أوامر الفلاتر
-
-| الأمر | الوصف | مثال |
-|------|-------|------|
-| `.حظر` | حظر رقم من نقل رسائله | `.حظر 201234567890` |
-| `.الغاء_حظر` | إلغاء حظر رقم | `.الغاء_حظر 201234567890` |
-| `.تفعيل_فلتر` | تفعيل نظام الفلترة | `.تفعيل_فلتر` |
-| `.تعطيل_فلتر` | تعطيل نظام الفلترة | `.تعطيل_فلتر` |
-
-### 🔔 أوامر التنبيهات الذكية
-
-| الأمر | الوصف | مثال |
-|------|-------|------|
-| `.اضافة_تنبيه` | إضافة كلمة للتنبيه | `.اضافة_تنبيه عاجل` |
-| `.حذف_تنبيه` | حذف كلمة تنبيه | `.حذف_تنبيه عاجل` |
-| `.التنبيهات` | عرض كلمات التنبيه | `.التنبيهات` |
-| `.تفعيل_تنبيهات` | تفعيل التنبيهات | `.تفعيل_تنبيهات` |
-| `.تعطيل_تنبيهات` | تعطيل التنبيهات | `.تعطيل_تنبيهات` |
-
-### 💬 أوامر الردود الآلية
-
-| الأمر | الوصف | مثال |
-|------|-------|------|
-| `.اضافة_رد` | إضافة رد آلي | `.اضافة_رد نص مرحبا \| أهلاً بك` |
-| `.حذف_رد` | حذف رد آلي | `.حذف_رد مرحبا` |
-| `.الردود` | عرض جميع الردود | `.الردود` |
-| `.تفعيل_ردود` | تفعيل الردود الآلية | `.تفعيل_ردود` |
-| `.تعطيل_ردود` | تعطيل الردود الآلية | `.تعطيل_ردود` |
-
-### ⏰ أوامر المهام المجدولة
-
-| الأمر | الوصف | مثال |
-|------|-------|------|
-| `.اضافة_جدول` | إضافة مهمة مجدولة | `.اضافة_جدول تقرير 08:00 report` |
-| `.حذف_جدول` | حذف مهمة مجدولة | `.حذف_جدول تقرير` |
-| `.الجداول` | عرض المهام المجدولة | `.الجداول` |
-
-### 📊 أوامر التقارير
-
-| الأمر | الوصف | مثال |
-|------|-------|------|
-| `.تقرير_يومي` | تقرير نشاط البوت اليومي | `.تقرير_يومي` |
-| `.تقرير_اسبوعي` | تقرير أسبوعي | `.تقرير_اسبوعي` |
-| `.تقرير_اخطاء` | تقرير الأخطاء | `.تقرير_اخطاء` |
-| `.تقرير_نشاط` | تقرير نشاط المستخدمين | `.تقرير_نشاط` |
-
-### 📝 أوامر السجلات
-
-| الأمر | الوصف | مثال |
-|------|-------|------|
-| `.لوج` | عرض آخر سطور من السجلات | `.لوج whatsapp` |
-| `.نظافة_لوجات` | حذف السجلات القديمة | `.نظافة_لوجات` |
-
-### 👔 أوامر المشرفين
-
-| الأمر | الوصف | مثال |
-|------|-------|------|
-| `.اضافة_مشرف` | إضافة مشرف | `.اضافة_مشرف 201234567890` |
-| `.حذف_مشرف` | حذف مشرف | `.حذف_مشرف 201234567890` |
-| `.المشرفين` | عرض قائمة المشرفين | `.المشرفين` |
-
-**ملاحظة:** معظم الأوامر متاحة فقط لمستخدمي النخبة (Elite Users)
-
-</div>
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
 
-## ❓ الأسئلة الشائعة (FAQ)
+## 👨‍💻 Author
 
-<div dir="rtl">
-
-### عام
-
-**س: هل يمكن استخدام البوت على Termux؟**
-ج: نعم! البوت يعمل على Termux بدون مشاكل. تأكد من تثبيت Node.js أولاً.
-
-**س: هل يحتاج البوت للعمل 24/7؟**
-ج: نعم، للحصول على أفضل تجربة. استخدم VPS أو Keep-Alive service.
-
-**س: كم يستهلك البوت من الموارد؟**
-ج: قليل جداً - حوالي 100-200 MB من الذاكرة في المتوسط.
-
-### الاتصال والإعداد
-
-**س: كيف أحصل على Telegram Bot Token؟**
-ج: تحدث مع [@BotFather](https://t.me/botfather) على Telegram واتبع التعليمات.
-
-**س: كيف أعرف ID الجروب في WhatsApp؟**
-ج: شغّل البوت وسيعرض قائمة بجميع الجروبات مع IDs.
-
-**س: البوت يطلب QR Code كل مرة؟**
-ج: احتفظ بمجلد `auth_info_baileys` - لا تحذفه.
-
-### الردود الآلية
-
-**س: الردود الآلية لا تعمل؟**
-ج: تأكد من:
-- تفعيل الردود بـ `.تفعيل_ردود`
-- أنك في محادثة خاصة (ليس جروب)
-- الكلمة المفتاحية صحيحة
-
-**س: كيف أضيف رد بملف؟**
-ج: استخدم المسار الكامل للملف:
-```
-.اضافة_رد ملف الكلمة | /path/to/file.pdf
-```
-
-**س: كيف أحفظ النصوص على عدة أسطر؟**
-ج: فقط اكتب الأمر على عدة أسطر في WhatsApp - سيُحفظ تلقائياً!
-
-### المشاكل الشائعة
-
-**س: خطأ "User not Elite"؟**
-ج: أضف رقمك في ملف `.env` كـ `OWNER_PHONE=201234567890`
-
-**س: الرسائل لا تُنقل إلى Telegram؟**
-ج: تحقق من:
-- Bot Token صحيح
-- Channel ID صحيح  
-- البوت مُضاف كـ Admin في القناة
-- البوت يعمل (`.الحالة`)
-
-**س: Connection Lost / Disconnected؟**
-ج: طبيعي! البوت سيعيد الاتصال تلقائياً. إذا استمر:
-- امسح QR Code مرة أخرى
-- تحقق من اتصال الإنترنت
-
-### Git والتحديثات
-
-**س: كيف أحدّث البوت لآخر إصدار؟**
-ج:
-```bash
-git stash
-git pull origin main
-git stash pop
-npm install
-```
-
-**س: "Merge Conflict" - ماذا أفعل؟**
-ج: استخدم Force Pull إذا لم تعدّل الكود:
-```bash
-git fetch origin
-git reset --hard origin/main
-```
-
-**س: كيف أعيد البوت لحالته الأصلية؟**
-ج:
-```bash
-git reset --hard HEAD
-git clean -fd
-```
-
-### الأمان
-
-**س: هل البوت آمن؟**
-ج: نعم، لكن:
-- لا تشارك ملف `.env`
-- استخدم رقم WhatsApp ثانوي
-- احفظ نسخة من `auth_info_baileys`
-
-**س: هل يمكن أن أُحظر من WhatsApp؟**
-ج: الاحتمال قليل إذا:
-- لم ترسل spam
-- لم تستخدم أرقام جدد جداً
-- لم تنقل آلاف الرسائل يومياً
-
-</div>
+**Obieda Hussien** ([@obieda-hussien](https://github.com/obieda-hussien))
 
 ---
 
-## 📞 الدعم
+## 🌟 Star History
 
-<div dir="rtl">
-
-إذا واجهت أي مشكلة أو لديك سؤال:
-
-- 🐛 افتح [Issue](https://github.com/obieda-hussien/what-sapp_bot/issues)
-- 💬 تواصل عبر [GitHub Discussions](https://github.com/obieda-hussien/what-sapp_bot/discussions)
-- ⭐ لا تنسى عمل Star للمشروع إذا أعجبك!
-
-</div>
-
----
-
-## ⚠️ تنبيهات مهمة
-
-<div dir="rtl">
-
-1. **الخصوصية:**
-   - لا تشارك ملف `.env` مع أي شخص
-   - لا ترفع ملف `.env` على Git
-   - احتفظ بنسخة احتياطية من `auth_info_baileys`
-
-2. **شروط الاستخدام:**
-   - استخدم البوت بمسؤولية
-   - احترم خصوصية الأعضاء
-   - التزم بشروط WhatsApp و Telegram
-
-3. **الأمان:**
-   - غيّر الـ tokens بشكل دوري
-   - استخدم server آمن
-   - فعّل 2FA على Telegram
-
-4. **الأداء:**
-   - لا تنقل جروبات ضخمة جداً (>1000 عضو)
-   - راقب استهلاك الموارد
-   - استخدم VPS أو Server مستقر
-
-</div>
-
----
-
-## 📝 الترخيص
-
-<div dir="rtl">
-
-هذا المشروع مرخص تحت **MIT License** - استخدمه كما تشاء! 🎉
-
-```
-MIT License
-
-Copyright (c) 2025 obieda-hussien
-
-يُسمح بحرية استخدام وتعديل وتوزيع هذا البرنامج
-مع الاحتفاظ بإشعار حقوق النشر هذا.
-```
-
-</div>
-
----
-
-## 👨‍💻 المطور
-
-<div dir="rtl">
-
-تم تطويره بكل ❤️ بواسطة [**Obieda Hussien**](https://github.com/obieda-hussien)
-
-- 🌐 GitHub: [@obieda-hussien](https://github.com/obieda-hussien)
-- 📧 للتواصل: عبر GitHub Issues
-
----
-
-### 🌟 إذا أعجبك المشروع
-
-لا تنسى عمل ⭐ **Star** للمشروع على GitHub!
-
-</div>
+If this bot helped you, consider giving it a star! ⭐
 
 ---
 
 <div align="center">
 
-**صنع في مصر 🇪🇬 بكل حب**
+**Made with ❤️ and lots of ☕**
 
-[![GitHub stars](https://img.shields.io/github/stars/obieda-hussien/what-sapp_bot?style=social)](https://github.com/obieda-hussien/what-sapp_bot/stargazers)
-[![GitHub forks](https://img.shields.io/github/forks/obieda-hussien/what-sapp_bot?style=social)](https://github.com/obieda-hussien/what-sapp_bot/network/members)
-[![GitHub issues](https://img.shields.io/github/issues/obieda-hussien/what-sapp_bot)](https://github.com/obieda-hussien/what-sapp_bot/issues)
-[![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](https://choosealicense.com/licenses/mit/)
+Built with [Baileys](https://github.com/WhiskeySockets/Baileys) • [Telegraf](https://telegraf.js.org/) • [Groq](https://groq.com/) • [Gemini](https://ai.google.dev/)
 
 </div>

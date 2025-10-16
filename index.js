@@ -35,7 +35,7 @@ import { checkSmartAlerts } from './plugins/alerts.js';
 import { checkPrivateChatKeyword, isAIEnabled } from './plugins/privateChat.js';
 import { checkDueSchedules } from './plugins/alerts.js';
 import { generateDailyReport } from './plugins/reports.js';
-import { processWithGroqAI, isGroqEnabled } from './utils/groqAssistant.js';
+import { processWithGroqAI, isGroqEnabled, validateAllApiKeys } from './utils/groqAssistant.js';
 import { canUseAutomaticReplies, canUseAI, getAutomaticReplyBlockMessage, getAIBlockMessage } from './utils/accessControl.js';
 
 dotenv.config();
@@ -50,7 +50,10 @@ console.log('╚═════════════════════�
 console.log(`📁 مجلد العمل: ${process.cwd()}`);
 console.log(`📝 ملف الإعدادات: ${CONFIG_PATH}`);
 console.log(`📂 ملف .env: ${process.env.TELEGRAM_BOT_TOKEN ? '✅ موجود' : '❌ غير موجود'}`);
-console.log(`🤖 Groq AI: ${process.env.GROQ_API_KEY ? '✅ مُفعّل' : '⚠️  غير مُفعّل (اختياري)'}`);
+
+// التحقق العميق من مفاتيح API
+validateAllApiKeys();
+
 console.log(`👥 عدد النخبة: ${initialConfig.eliteUsers.length}`);
 if (initialConfig.eliteUsers.length > 0) {
     console.log(`   📱 النخبة: ${initialConfig.eliteUsers.join(', ')}`);
