@@ -16,30 +16,242 @@ const __dirname = path.dirname(__filename);
 
 // تهيئة Groq API
 let groqClient = null;
+let groqKeyValidated = false;
+let groqKeyValid = false;
 
 // تهيئة Google Gemini API
 let geminiClient = null;
+let geminiKeyValidated = false;
+let geminiKeyValid = false;
 
 /**
- * تهيئة Groq Client
+ * التحقق من صلاحية مفتاح API بشكل عميق
+ * Deep validation of API key format and structure
  */
-function initGroq() {
-    if (!groqClient && process.env.GROQ_API_KEY) {
-        groqClient = new Groq({
-            apiKey: process.env.GROQ_API_KEY
-        });
+function validateGroqApiKey(apiKey) {
+    if (!apiKey || typeof apiKey !== 'string') {
+        return {
+            valid: false,
+            reason: 'المفتاح فارغ أو غير صالح'
+        };
     }
-    return groqClient;
+    
+    // إزالة المسافات من البداية والنهاية
+    const trimmedKey = apiKey.trim();
+    
+    // التحقق من أن المفتاح ليس فارغاً بعد التنظيف
+    if (trimmedKey.length === 0) {
+        return {
+            valid: false,
+            reason: 'المفتاح فارغ بعد إزالة المسافات'
+        };
+    }
+    
+    // التحقق من الطول المناسب (Groq API keys عادة طويلة)
+    if (trimmedKey.length < 20) {
+        return {
+            valid: false,
+            reason: 'المفتاح قصير جداً - يجب أن يكون على الأقل 20 حرفاً'
+        };
+    }
+    
+    // التحقق من أن المفتاح يحتوي فقط على أحرف وأرقام وشرطات وشرطات سفلية
+    const validPattern = /^[a-zA-Z0-9_-]+$/;
+    if (!validPattern.test(trimmedKey)) {
+        return {
+            valid: false,
+            reason: 'المفتاح يحتوي على أحرف غير صالحة - يجب أن يحتوي فقط على حروف وأرقام'
+        };
+    }
+    
+    // التحقق من أن المفتاح لا يبدأ بـ "gsk_" (نمط Groq المعروف)
+    // أو أنه يبدأ بنمط صالح آخر
+    const startsWithValidPrefix = trimmedKey.startsWith('gsk_') || 
+                                   /^[a-zA-Z0-9]/.test(trimmedKey);
+    
+    if (!startsWithValidPrefix) {
+        return {
+            valid: false,
+            reason: 'تنسيق المفتاح غير صحيح'
+        };
+    }
+    
+    return {
+        valid: true,
+        key: trimmedKey
+    };
 }
 
 /**
- * تهيئة Google Gemini Client
+ * التحقق من صلاحية مفتاح Gemini API
+ */
+function validateGeminiApiKey(apiKey) {
+    if (!apiKey || typeof apiKey !== 'string') {
+        return {
+            valid: false,
+            reason: 'المفتاح فارغ أو غير صالح'
+        };
+    }
+    
+    const trimmedKey = apiKey.trim();
+    
+    if (trimmedKey.length === 0) {
+        return {
+            valid: false,
+            reason: 'المفتاح فارغ بعد إزالة المسافات'
+        };
+    }
+    
+    if (trimmedKey.length < 20) {
+        return {
+            valid: false,
+            reason: 'المفتاح قصير جداً'
+        };
+    }
+    
+    // Gemini API keys usually start with "AIza"
+    const validPattern = /^AIza[a-zA-Z0-9_-]+$/;
+    if (!validPattern.test(trimmedKey)) {
+        return {
+            valid: false,
+            reason: 'تنسيق مفتاح Gemini غير صحيح - يجب أن يبدأ بـ AIza'
+        };
+    }
+    
+    return {
+        valid: true,
+        key: trimmedKey
+    };
+}
+
+/**
+ * التحقق من جميع مفاتيح API عند بدء التشغيل
+ * Validates all API keys on startup
+ */
+export function validateAllApiKeys() {
+    console.log('\n🔍 التحقق من مفاتيح API...');
+    console.log('═══════════════════════════════════════════════════');
+    
+    let allValid = true;
+    
+    // التحقق من Groq API Key
+    if (process.env.GROQ_API_KEY) {
+        const groqValidation = validateGroqApiKey(process.env.GROQ_API_KEY);
+        if (groqValidation.valid) {
+            console.log('✅ Groq API Key: صالح ومنسق بشكل صحيح');
+        } else {
+            console.log('❌ Groq API Key: غير صالح');
+            console.log(`   السبب: ${groqValidation.reason}`);
+            console.log('   💡 احصل على مفتاح جديد من: https://console.groq.com/keys');
+            allValid = false;
+        }
+    } else {
+        console.log('⚠️  Groq API Key: غير موجود (اختياري)');
+        console.log('   💡 للحصول على مفتاح مجاني: https://console.groq.com/keys');
+    }
+    
+    // التحقق من Gemini API Key
+    if (process.env.GEMINI_API_KEY) {
+        const geminiValidation = validateGeminiApiKey(process.env.GEMINI_API_KEY);
+        if (geminiValidation.valid) {
+            console.log('✅ Gemini API Key: صالح ومنسق بشكل صحيح');
+        } else {
+            console.log('❌ Gemini API Key: غير صالح');
+            console.log(`   السبب: ${geminiValidation.reason}`);
+            console.log('   💡 احصل على مفتاح جديد من: https://makersuite.google.com/app/apikey');
+            allValid = false;
+        }
+    } else {
+        console.log('⚠️  Gemini API Key: غير موجود (اختياري - يُستخدم كـ Fallback)');
+        console.log('   💡 للحصول على مفتاح مجاني: https://makersuite.google.com/app/apikey');
+    }
+    
+    console.log('═══════════════════════════════════════════════════');
+    
+    if (!process.env.GROQ_API_KEY && !process.env.GEMINI_API_KEY) {
+        console.log('⚠️  تحذير: لا يوجد أي مفتاح AI متاح!');
+        console.log('   البوت سيعمل بالردود الآلية فقط (بدون ذكاء اصطناعي)');
+    }
+    
+    console.log('');
+    
+    return allValid;
+}
+
+/**
+ * تهيئة Groq Client مع التحقق العميق
+ */
+function initGroq() {
+    if (groqClient) {
+        return groqClient;
+    }
+    
+    if (!process.env.GROQ_API_KEY) {
+        return null;
+    }
+    
+    // التحقق من صلاحية المفتاح
+    const validation = validateGroqApiKey(process.env.GROQ_API_KEY);
+    
+    if (!validation.valid) {
+        console.error('❌ مفتاح Groq API غير صالح:', validation.reason);
+        console.error('💡 تأكد من نسخ المفتاح بشكل صحيح من https://console.groq.com');
+        groqKeyValidated = true;
+        groqKeyValid = false;
+        return null;
+    }
+    
+    try {
+        groqClient = new Groq({
+            apiKey: validation.key
+        });
+        groqKeyValidated = true;
+        groqKeyValid = true;
+        console.log('✅ تم تهيئة Groq AI بنجاح');
+        return groqClient;
+    } catch (error) {
+        console.error('❌ فشل تهيئة Groq Client:', error.message);
+        groqKeyValidated = true;
+        groqKeyValid = false;
+        return null;
+    }
+}
+
+/**
+ * تهيئة Google Gemini Client مع التحقق العميق
  */
 function initGemini() {
-    if (!geminiClient && process.env.GEMINI_API_KEY) {
-        geminiClient = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    if (geminiClient) {
+        return geminiClient;
     }
-    return geminiClient;
+    
+    if (!process.env.GEMINI_API_KEY) {
+        return null;
+    }
+    
+    // التحقق من صلاحية المفتاح
+    const validation = validateGeminiApiKey(process.env.GEMINI_API_KEY);
+    
+    if (!validation.valid) {
+        console.error('❌ مفتاح Gemini API غير صالح:', validation.reason);
+        console.error('💡 تأكد من نسخ المفتاح بشكل صحيح من https://makersuite.google.com/app/apikey');
+        geminiKeyValidated = true;
+        geminiKeyValid = false;
+        return null;
+    }
+    
+    try {
+        geminiClient = new GoogleGenerativeAI(validation.key);
+        geminiKeyValidated = true;
+        geminiKeyValid = true;
+        console.log('✅ تم تهيئة Gemini AI بنجاح');
+        return geminiClient;
+    } catch (error) {
+        console.error('❌ فشل تهيئة Gemini Client:', error.message);
+        geminiKeyValidated = true;
+        geminiKeyValid = false;
+        return null;
+    }
 }
 
 // تخزين سياق المحادثات (ذاكرة البوت)
@@ -1218,12 +1430,20 @@ export async function processWithGroqAI(userMessage, userId, userName = "الط�
     try {
         const groq = initGroq();
         
+        // التحقق من توفر Groq بشكل عميق
         if (!groq) {
-            console.log('⚠️ Groq API غير مُفعّل - GROQ_API_KEY غير موجود');
+            if (!process.env.GROQ_API_KEY) {
+                console.log('⚠️ Groq API غير مُفعّل - GROQ_API_KEY غير موجود في ملف .env');
+                console.log('💡 للحصول على مفتاح مجاني: https://console.groq.com/keys');
+            } else if (groqKeyValidated && !groqKeyValid) {
+                console.log('⚠️ Groq API Key غير صالح - تم التحقق منه مسبقاً');
+                console.log('💡 تأكد من نسخ المفتاح بشكل صحيح من https://console.groq.com/keys');
+            }
+            
             return {
                 success: false,
                 message: null,
-                error: "Groq API not configured"
+                error: "Groq API not configured or invalid"
             };
         }
         
@@ -1371,20 +1591,99 @@ export async function processWithGroqAI(userMessage, userId, userName = "الط�
         return finalResponse;
         
     } catch (error) {
-        console.error('❌ خطأ في Groq AI:', error.message);
+        // التحقق العميق من نوع الخطأ
+        const errorMessage = error.message || '';
+        const errorString = JSON.stringify(error);
         
-        // التحقق من نوع الخطأ - لا نستخدم Gemini إلا في حالات محددة
-        const shouldFallbackToGemini = error.message && (
-            error.message.includes('rate_limit') || 
-            error.message.includes('model_not_found') ||
-            error.message.includes('insufficient_quota')
-        );
+        // التحقق من خطأ 401 (مفتاح API غير صالح)
+        const is401Error = errorString.includes('401') || 
+                          errorString.includes('invalid_api_key') ||
+                          errorString.includes('Invalid API Key') ||
+                          errorMessage.includes('401') ||
+                          errorMessage.includes('Unauthorized');
+        
+        // التحقق من خطأ 403 (محظور)
+        const is403Error = errorString.includes('403') || 
+                          errorMessage.includes('403') ||
+                          errorMessage.includes('Forbidden');
+        
+        // التحقق من خطأ rate limit
+        const isRateLimitError = errorString.includes('rate_limit') ||
+                                errorMessage.includes('rate_limit') ||
+                                errorString.includes('429') ||
+                                errorMessage.includes('429');
+        
+        // التحقق من خطأ quota
+        const isQuotaError = errorString.includes('insufficient_quota') ||
+                            errorMessage.includes('insufficient_quota') ||
+                            errorMessage.includes('quota exceeded');
+        
+        // التحقق من خطأ النموذج
+        const isModelError = errorString.includes('model_not_found') ||
+                            errorMessage.includes('model_not_found');
+        
+        // طباعة الخطأ بشكل واضح
+        if (is401Error) {
+            console.error('❌ خطأ في Groq AI: 401 {"error":{"message":"Invalid API Key","type":"invalid_request_error","code":"invalid_api_key"}}');
+            console.error('');
+            console.error('🔍 تشخيص المشكلة:');
+            console.error('   السبب: مفتاح Groq API غير صالح أو منتهي الصلاحية');
+            console.error('');
+            console.error('💡 الحلول المقترحة:');
+            console.error('   1. تحقق من أن GROQ_API_KEY في ملف .env صحيح');
+            console.error('   2. احصل على مفتاح جديد من: https://console.groq.com/keys');
+            console.error('   3. تأكد من نسخ المفتاح كاملاً بدون مسافات إضافية');
+            console.error('   4. أعد تشغيل البوت بعد تحديث المفتاح');
+            console.error('');
+            
+            // تعليم المفتاح كغير صالح
+            groqKeyValid = false;
+            groqKeyValidated = true;
+        } else if (is403Error) {
+            console.error('❌ خطأ في Groq AI: 403 Forbidden');
+            console.error('   السبب: المفتاح غير مصرح له بالوصول إلى هذا النموذج');
+        } else if (isRateLimitError) {
+            console.error('❌ خطأ في Groq AI: تم تجاوز حد الطلبات (Rate Limit)');
+            console.error('   السبب: تم إرسال طلبات كثيرة جداً في وقت قصير');
+        } else if (isQuotaError) {
+            console.error('❌ خطأ في Groq AI: نفذت الحصة المجانية (Quota Exceeded)');
+            console.error('   السبب: استنفذت الحصة اليومية أو الشهرية');
+        } else if (isModelError) {
+            console.error('❌ خطأ في Groq AI: النموذج غير موجود');
+            console.error('   السبب: النموذج المطلوب غير متاح أو تم إيقافه');
+        } else {
+            console.error('❌ خطأ في Groq AI:', errorMessage);
+        }
+        
+        // تحديد ما إذا كان يجب التحويل إلى Gemini
+        const shouldFallbackToGemini = 
+            isRateLimitError || 
+            isQuotaError || 
+            isModelError ||
+            is401Error ||  // إضافة 401 للـ fallback
+            is403Error;     // إضافة 403 للـ fallback
         
         if (shouldFallbackToGemini) {
-            console.log('🔄 محاولة التحويل إلى Gemini كـ Fallback...');
+            console.log('');
+            console.log('🔄 محاولة التحويل إلى Gemini AI كـ Fallback...');
             
             // محاولة استخدام Gemini كـ Fallback
             try {
+                // التحقق من توفر Gemini
+                const gemini = initGemini();
+                
+                if (!gemini) {
+                    console.error('⚠️ Gemini AI غير متوفر - GEMINI_API_KEY غير موجود أو غير صالح');
+                    console.error('💡 للحصول على مفتاح Gemini: https://makersuite.google.com/app/apikey');
+                    console.error('');
+                    console.error('❌ فشل Groq وGemini غير متوفر - لا يمكن الرد على الرسالة');
+                    return {
+                        success: false,
+                        message: null,
+                        error: `Groq failed (${is401Error ? '401 Invalid API Key' : errorMessage}), Gemini not available`
+                    };
+                }
+                
                 // إضافة رسالة المستخدم للذاكرة إذا لم تكن مضافة
                 const currentMemory = getConversationContext(userId);
                 const lastMessage = currentMemory[currentMemory.length - 1];
@@ -1409,15 +1708,15 @@ export async function processWithGroqAI(userMessage, userId, userName = "الط�
                     if (geminiResponse.text) {
                         addToMemory(userId, "assistant", geminiResponse.text);
                     }
-                    console.log('✅ نجح Fallback إلى Gemini!');
+                    console.log('✅ نجح Fallback إلى Gemini AI!');
                     return geminiResponse;
                 } else {
                     // فشل Gemini أيضاً
-                    console.error('❌ فشل Gemini Fallback أيضاً');
+                    console.error('❌ فشل Gemini Fallback أيضاً:', geminiResponse.error);
                     return {
                         success: false,
                         message: null,
-                        error: `Groq failed: ${error.message}, Gemini also failed: ${geminiResponse.error}`
+                        error: `Groq failed: ${is401Error ? '401 Invalid API Key' : errorMessage}, Gemini also failed: ${geminiResponse.error}`
                     };
                 }
             } catch (fallbackError) {
@@ -1425,16 +1724,16 @@ export async function processWithGroqAI(userMessage, userId, userName = "الط�
                 return {
                     success: false,
                     message: null,
-                    error: `Groq failed: ${error.message}, Gemini fallback failed: ${fallbackError.message}`
+                    error: `Groq failed: ${is401Error ? '401 Invalid API Key' : errorMessage}, Gemini fallback failed: ${fallbackError.message}`
                 };
             }
         } else {
-            // خطأ آخر غير متعلق بالـ rate limit - نرجع الخطأ مباشرة
+            // خطأ آخر - نرجع الخطأ مباشرة
             console.error('❌ خطأ في Groq (لن يتم استخدام Gemini Fallback)');
             return {
                 success: false,
                 message: null,
-                error: error.message
+                error: errorMessage
             };
         }
     }
